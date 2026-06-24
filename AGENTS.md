@@ -52,6 +52,25 @@ See [backend/plugins/gitlab/impl/impl.go](backend/plugins/gitlab/impl/impl.go) f
 - `PluginMigration`: MigrationScripts() for DB schema evolution
 - `PluginSource`: Connection(), Scope(), ScopeConfig()
 
+### Advanced Plugin Interfaces
+- `PluginInit`: Optional initialization hook with `Init(basicRes)` method for resource setup
+- `PluginOpenApiSpec`: Remote plugins can expose OpenAPI specs via `OpenApiSpec()` method
+- `PluginMetric`: For metrics plugins requiring `RequiredDataEntities()`, `IsProjectMetric()`, `RunAfter()`, `Settings()`
+- `DataSourcePluginBlueprintV200`: Project-aware pipeline generation with `MakeDataSourcePipelinePlanV200()` for cross-plugin scope mapping
+- `MetricPluginBlueprintV200`: Similar to DataSourcePluginBlueprintV200 for metric calculation plugins
+
+### Authentication Patterns
+Plugins can support multiple authentication methods via these interfaces:
+- `CacheableConnection`: Extends `ApiConnection` with `GetHash()` for connection caching
+- `MultiAuthenticator`: Base interface with `GetAuthMethod()` returning `BasicAuth`, `AccessToken`, or `AppKey`
+- `BasicAuthenticator`: Implement `GetBasicAuthenticator()` for HTTP Basic auth
+- `AccessTokenAuthenticator`: Implement `GetAccessTokenAuthenticator()` for Bearer token auth
+- `AppKeyAuthenticator`: Implement `GetAppKeyAuthenticator()` for API key/secret pairs
+- `PrepareApiClient`: Hook in connection for initialization (e.g., token refresh) via `PrepareApiClient(apiClient)`
+
+### Dynamic Models
+- `DynamicTabler` interface: For runtime-generated models with methods `Unwrap()`, `NewValue()`, `From()`, `To()`
+
 ### Subtask Pattern (Collector → Extractor → Converter)
 ```go
 // 1. Register subtask in tasks/register.go via init()
@@ -82,13 +101,18 @@ var CollectIssuesMeta = plugin.SubTaskMeta{
 make dep              # Install Go + Python dependencies
 make build            # Build plugins + server
 make dev              # Build + run server
-make godev            # Go-only dev (no Python plugins)
+make godev            # Go-only dev (no Python remote plugins)
 make unit-test        # Run all unit tests
 make e2e-test         # Run E2E tests
 
 # From backend/
 make swag             # Regenerate Swagger docs (required after API changes)
 make lint             # Run golangci-lint
+make mock             # Regenerate mocks from interfaces
+make migration-script-lint  # Validate migration script format
+make build-plugin-debug     # Build plugins with debug symbols (DEVLAKE_DEBUG=1)
+make build-pydevlake        # Install/sync Python plugin framework dependencies
+make e2e-test-go-plugins    # Run E2E tests for Go plugins only
 ```
 
 ### Running Locally
@@ -101,7 +125,7 @@ cd config-ui && yarn && yarn start                          # UI on :4000
 ## Testing
 
 ### Unit Tests
-Place `*_test.go` files alongside source. Use mocks from `backend/mocks/`.
+Place `*_test.go` files alongside source. Use mocks from `backend/mocks/`. Mocks are auto-generated via `make mock` from all interfaces in `core/` and `helpers/`.
 
 ### E2E Tests for Plugins
 Use CSV fixtures in `e2e/` directory. See [backend/test/helper/](backend/test/helper/) for the Go test client that can spin up an in-memory DevLake instance.
@@ -116,6 +140,9 @@ helper.ConnectLocalServer(t, &helper.LocalClientConfig{
 })
 ```
 
+### Model Validation
+Run `make migration-script-lint` from `backend/` to validate all migration scripts follow the correct format (`YYYYMMDD_description.go`).
+
 ## Python Plugins
 Located in `backend/python/plugins/`. Use Poetry for dependencies. See [backend/python/README.md](backend/python/README.md).
 
@@ -124,9 +151,14 @@ Located in `backend/python/plugins/`. Use Poetry for dependencies. See [backend/
 - Domain model IDs: Use `didgen.NewDomainIdGenerator` for consistent cross-plugin IDs
 - All plugins must be independent - no cross-plugin imports
 - Apache 2.0 license header required on all source files
+- Mocks are auto-generated: don't edit files in `backend/mocks/`, regenerate with `make mock`
+- Optional plugin interfaces (PluginInit, PluginOpenApiSpec, PluginMetric) should only be implemented if functionality is needed
+- Authentication: Use `CacheableConnection` interface if connection needs caching; implement appropriate `*Authenticator` for each auth method supported
 
 ## Common Pitfalls
 - Forgetting to add models to `GetTablesInfo()` fails `plugins/table_info_test.go`
-- Migration scripts must be added to `All()` in `register.go`
-- API changes require running `make swag` to update Swagger docs
+- Migration scripts must be added to `All()` in `register.go` AND follow `YYYYMMDD_description.go` naming (validate with `make migration-script-lint`)
+- API changes require running `make swag` to update Swagger docs (this runs `make mock` first)
 - Python plugins require `libgit2` for gitextractor functionality
+- New Plugin interfaces like `PluginInit` or `PluginOpenApiSpec` are optional - only implement if needed
+- Blueprint V2.0 implementation required for plugins that support project-aware scope mapping

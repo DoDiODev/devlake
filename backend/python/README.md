@@ -25,7 +25,7 @@ can be found in [here](./pydevlake).
 ## Create the plugin project
 
 
-Make sure you have [Poetry](https://python-poetry.org/docs/#installation) installed.
+Make sure you have [Poetry](https://python-poetry.org/docs/#installation) installed (recommended pinned version: `2.4.1`, for example `pipx install "poetry==2.4.1"`).
 Move to `python/plugins` and execute `poetry new myplugin`.
 This will generate a new directory for your plugin.
 

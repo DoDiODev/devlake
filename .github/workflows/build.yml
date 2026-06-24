@@ -19,6 +19,9 @@ name: Build-Images-Push-Docker
 env:
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USER }}
   DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+  DEVLAKE_BACKEND_DOCKERFILE: ./backend/Dockerfile
+  DEVLAKE_CONFIG_UI_DOCKERFILE: ./config-ui/Dockerfile
+  DEVLAKE_GRAFANA_DOCKERFILE: ./grafana/Dockerfile
 on:
   push:
     tags:
@@ -55,6 +58,7 @@ jobs:
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f  # v7.1.0
         with:
           context: ./backend
+          file: ${{ env.DEVLAKE_BACKEND_DOCKERFILE }}
           push: true
           target: builder
           tags: ${{ secrets.DOCKERHUB_OWNER }}/devlake:amd64-builder
@@ -87,6 +91,7 @@ jobs:
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f  # v7.1.0
         with:
           context: ./backend
+          file: ${{ env.DEVLAKE_BACKEND_DOCKERFILE }}
           push: true
           target: base
           tags: ${{ secrets.DOCKERHUB_OWNER }}/devlake:base
@@ -130,6 +135,7 @@ jobs:
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f  # v7.1.0
         with:
           context: ./backend
+          file: ${{ env.DEVLAKE_BACKEND_DOCKERFILE }}
           push: false
           target: build
           tags: ${{ secrets.DOCKERHUB_OWNER }}/devlake:build-cache-${{ matrix.platform }}
@@ -197,6 +203,7 @@ jobs:
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f  # v7.1.0
         with:
           context: ./backend
+          file: ${{ env.DEVLAKE_BACKEND_DOCKERFILE }}
           push: true
           tags: ${{ steps.get_push_tags.outputs.TAGS }}
           platforms: linux/amd64,linux/arm64
@@ -236,9 +243,11 @@ jobs:
           - name: config-ui
             image: devlake-config-ui
             context: config-ui
+            dockerfile: ./config-ui/Dockerfile
           - name: grafana
             image: devlake-dashboard
             context: grafana
+            dockerfile: ./grafana/Dockerfile
     steps:
       - name: Free Disk Space
         run: |
@@ -276,6 +285,7 @@ jobs:
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f  # v7.1.0
         with:
           context: ${{ matrix.build.context }}
+          file: ${{ matrix.build.dockerfile }}
           push: true
           tags: ${{ steps.get_push_tags.outputs.TAGS }}
           platforms: linux/amd64,linux/arm64
