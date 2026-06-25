@@ -63,7 +63,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -152,7 +152,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -220,7 +220,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -288,7 +288,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -356,7 +356,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -448,7 +448,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -540,7 +540,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -602,7 +602,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -670,7 +670,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -738,7 +738,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -806,7 +806,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -898,7 +898,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -989,7 +989,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -1080,7 +1080,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",

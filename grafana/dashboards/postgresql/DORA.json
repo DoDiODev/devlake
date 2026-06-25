@@ -42,7 +42,7 @@
         "content": "- See [how to config](https://devlake.apache.org/docs/DORA) this dashboard\n- Data Sources Required: \n  - `Deployments` from Jenkins, GitLab CI, GitHub Action, webhook, etc. \n  - `Pull Requests` from GitHub PRs, GitLab MRs, BitBucket PRs, Azure DevOps PRs, etc.\n  - `Incidents` from Jira issues, GitHub issues, TAPD issues, PagerDuty Incidents, etc. \n- Transformation Required: Define `deployments` and `incidents` in [data transformations](https://devlake.apache.org/docs/Configuration/Tutorial#step-3---add-transformations-optional) while configuring the blueprint of a project.\n- You can validate/debug this dashboard with the [DORA validation dashboard](/grafana/d/KGkUnV-Vz/dora-dashboard-validation)\n- DORA benchmarks vary in different years. You can switch the benchmarks to change them.\n- In DORA's official report in 2023, metric 'failed deployment recovery time' has replaced 'MTTR'.",
         "mode": "markdown"
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "title": "Dashboard Introduction",
       "type": "text"
     },
@@ -211,7 +211,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -358,7 +358,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -504,7 +504,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -651,7 +651,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -805,7 +805,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -941,7 +941,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -1074,7 +1074,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -1228,7 +1228,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -1386,7 +1386,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",

@@ -63,7 +63,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -152,7 +152,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -220,7 +220,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -288,7 +288,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -356,7 +356,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -448,7 +448,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -540,7 +540,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -602,7 +602,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -670,7 +670,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -738,7 +738,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -806,7 +806,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -898,7 +898,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -989,7 +989,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",
@@ -1080,7 +1080,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "postgresql",

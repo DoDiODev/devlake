@@ -62,7 +62,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -116,7 +116,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -170,7 +170,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -232,7 +232,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -299,7 +299,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -363,7 +363,7 @@
         "showThresholdMarkers": true,
         "sizing": "auto"
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -417,7 +417,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -471,7 +471,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -525,7 +525,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -579,7 +579,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -633,7 +633,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -687,7 +687,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -784,7 +784,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -868,7 +868,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -922,7 +922,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -963,7 +963,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -1060,7 +1060,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -1144,7 +1144,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
@@ -1198,7 +1198,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "11.6.2",
+      "pluginVersion": "12.4.5",
       "targets": [
         {
           "datasource": "mysql",
