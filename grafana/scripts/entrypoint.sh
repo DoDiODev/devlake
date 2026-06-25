@@ -62,15 +62,61 @@ echo "Database type: $MODE"
 # Remove unused dashboard folder to prevent confusion
 if [ "$MODE" = "mysql" ]; then
   rm -rf /etc/grafana/dashboards/postgresql
-  export GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH="/etc/grafana/dashboards/mysql/Homepage.json"
 else
   rm -rf /etc/grafana/dashboards/mysql
   SSL_MODE="${DATABASE_SSL_MODE:-disable}"
-  export GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH="/etc/grafana/dashboards/postgresql/Homepage.json"
   echo "SSL Mode: ${SSL_MODE}"
 fi
 
+# Locate Homepage.json for the home dashboard. The layout differs by deployment:
+#  - baked-in image keeps variant subfolders: /etc/grafana/dashboards/<mode>/Homepage.json
+#  - dev compose bind-mounts the variant folder directly: /etc/grafana/dashboards/Homepage.json
+# Probe both so the home dashboard resolves in either case (a wrong path makes
+# Grafana 12 return HTTP 500 "Failed to load home dashboard").
+for _hp in \
+  "/etc/grafana/dashboards/${MODE}/Homepage.json" \
+  "/etc/grafana/dashboards/Homepage.json"; do
+  if [ -f "$_hp" ]; then
+    export GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH="$_hp"
+    break
+  fi
+done
+
 echo "Homepage: $GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH"
+
+# --- Legacy persistent-volume hygiene -------------------------------------
+# This image runs as an arbitrary uid with gid 0 (OpenShift-compatible). Volumes
+# created by older dashboard images (uid 472, file mode 0640) can be read-only for
+# the current runtime user, which makes Grafana's DB migrations fail with
+# "attempt to write a readonly database". Best-effort self-heal here; if it can't
+# be fixed (non-root, non-owner) print a clear, actionable error instead of a
+# cryptic SQLite crash.
+GRAFANA_DATA_DIR="${GF_PATHS_DATA:-/var/lib/grafana}"
+GRAFANA_DB="${GRAFANA_DATA_DIR}/grafana.db"
+
+if [ -e "$GRAFANA_DB" ] && [ ! -w "$GRAFANA_DB" ]; then
+  echo "WARNING: ${GRAFANA_DB} not writable by $(id -u):$(id -g); attempting permission fix..."
+  chgrp -R 0 "$GRAFANA_DATA_DIR" 2>/dev/null || true
+  chmod -R g+rwX "$GRAFANA_DATA_DIR" 2>/dev/null || true
+fi
+
+if [ -e "$GRAFANA_DB" ] && [ ! -w "$GRAFANA_DB" ]; then
+  echo "ERROR: ${GRAFANA_DB} is still read-only for gid 0."
+  echo "       The persistent volume was likely created by an older image (uid 472, mode 0640)."
+  echo "       Fix it once from the host, then recreate this container:"
+  echo "         docker run --rm -v <project>_grafana-storage:/data alpine \\"
+  echo "           sh -c 'chgrp -R 0 /data && chmod -R g+rwX /data'"
+fi
+
+# Remove the deprecated Angular grafana-piechart-panel plugin if it lingers in a
+# legacy volume. Grafana 12 dropped Angular support and dashboards now use the
+# core "piechart" panel; leaving it causes noisy plugin-validation errors.
+LEGACY_PIECHART="${GRAFANA_DATA_DIR}/plugins/grafana-piechart-panel"
+if [ -d "$LEGACY_PIECHART" ]; then
+  echo "Removing deprecated grafana-piechart-panel from data volume..."
+  rm -rf "$LEGACY_PIECHART" 2>/dev/null || true
+fi
+# --------------------------------------------------------------------------
 
 # Create empty datasource.yml (datasources created via API)
 cat > "$DATASOURCE_FILE" << HEADER
@@ -89,6 +135,11 @@ cat > "$DATASOURCE_FILE" << HEADER
 # See the License for the specific language governing permissions and
 # limitations under the License.
 HEADER
+
+# Admin credentials used by the datasource provisioning API calls below.
+# Defaults to Grafana's built-in admin password; override via GF_SECURITY_ADMIN_PASSWORD.
+# Exported so Grafana itself and the curl calls use the same value.
+export GF_SECURITY_ADMIN_PASSWORD="${GF_SECURITY_ADMIN_PASSWORD:-admin}"
 
 # Start Grafana in background
 /run.sh "$@" &
@@ -164,6 +215,12 @@ for i in $(seq 1 10); do
 
   if echo "$RESPONSE" | grep -q '"id"'; then
     echo "Datasource created successfully"
+    break
+  elif echo "$RESPONSE" | grep -q "already exists"; then
+    # A datasource with this name is already present (e.g. provisioned by an
+    # older image into a persistent volume). It cannot be recreated via the API
+    # but is functional, so treat this as success instead of retrying.
+    echo "Datasource already exists; keeping existing one"
     break
   elif echo "$RESPONSE" | grep -q "database is locked"; then
     echo "DB locked, retry $i/10..."
