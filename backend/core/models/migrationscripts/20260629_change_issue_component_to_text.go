@@ -23,18 +23,20 @@ import (
 	"github.com/apache/incubator-devlake/core/plugin"
 )
 
-var _ plugin.MigrationScript = (*changeIssueComponentType)(nil)
+var _ plugin.MigrationScript = (*changeIssueComponentToText)(nil)
 
-type changeIssueComponentType struct{}
+type changeIssueComponentToText struct{}
 
-func (script *changeIssueComponentType) Up(basicRes context.BasicRes) errors.Error {
+func (script *changeIssueComponentToText) Up(basicRes context.BasicRes) errors.Error {
+	// the previous script (20240813) targeted the non-existent "components" column,
+	// the actual column is the singular "component" which stayed varchar(255).
 	return basicRes.GetDal().ModifyColumnType("issues", "component", "text")
 }
 
-func (*changeIssueComponentType) Version() uint64 {
-	return 20240813153901
+func (*changeIssueComponentToText) Version() uint64 {
+	return 20250629120000
 }
 
-func (*changeIssueComponentType) Name() string {
-	return "change issues.components type to text"
+func (*changeIssueComponentToText) Name() string {
+	return "change issues.component type to text"
 }

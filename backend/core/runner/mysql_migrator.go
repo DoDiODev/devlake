@@ -79,7 +79,7 @@ func (m devlakeMysqlMigrator) AddColumn(value interface{}, name string) error {
 		values := []interface{}{m.CurrentTable(stmt), columnName, fieldType}
 
 		var alterSQL strings.Builder
-		alterSQL.WriteString("ALTER TABLE ? ADD ? ?")
+		_, _ = alterSQL.WriteString("ALTER TABLE ? ADD ? ?")
 
 		// gorm.io/driver/mysql v1.5.x (the version DevLake's migrations were
 		// written against) never emitted a PRIMARY KEY clause from AddColumn:
@@ -93,7 +93,7 @@ func (m devlakeMysqlMigrator) AddColumn(value interface{}, name string) error {
 		// auto_increment column that is not a key), and only when the table does
 		// not already have a primary key.
 		if strings.Contains(strings.ToLower(fieldType.SQL), "auto_increment") && !m.tableHasPrimaryKey(stmt.Table) {
-			alterSQL.WriteString(", ADD PRIMARY KEY (?)")
+			_, _ = alterSQL.WriteString(", ADD PRIMARY KEY (?)")
 			values = append(values, columnName)
 		}
 		return m.DB.Exec(alterSQL.String(), values...).Error
