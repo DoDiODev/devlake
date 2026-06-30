@@ -33,7 +33,7 @@ services:
       MYSQL_PASSWORD: merico
 
   postgres-test:
-    image: postgres:14.2-alpine
+    image: postgres:18.1-alpine
     restart: always
     ports:
       - "3308:5432"
