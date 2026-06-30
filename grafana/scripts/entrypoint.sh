@@ -72,7 +72,7 @@ fi
 #  - baked-in image keeps variant subfolders: /etc/grafana/dashboards/<mode>/Homepage.json
 #  - dev compose bind-mounts the variant folder directly: /etc/grafana/dashboards/Homepage.json
 # Probe both so the home dashboard resolves in either case (a wrong path makes
-# Grafana 12 return HTTP 500 "Failed to load home dashboard").
+# Grafana 12+ return HTTP 500 "Failed to load home dashboard").
 for _hp in \
   "/etc/grafana/dashboards/${MODE}/Homepage.json" \
   "/etc/grafana/dashboards/Homepage.json"; do
@@ -109,7 +109,7 @@ if [ -e "$GRAFANA_DB" ] && [ ! -w "$GRAFANA_DB" ]; then
 fi
 
 # Remove the deprecated Angular grafana-piechart-panel plugin if it lingers in a
-# legacy volume. Grafana 12 dropped Angular support and dashboards now use the
+# legacy volume. Grafana 12+ dropped Angular support and dashboards now use the
 # core "piechart" panel; leaving it causes noisy plugin-validation errors.
 LEGACY_PIECHART="${GRAFANA_DATA_DIR}/plugins/grafana-piechart-panel"
 if [ -d "$LEGACY_PIECHART" ]; then
@@ -156,6 +156,17 @@ for i in $(seq 1 60); do
   sleep 2
 done
 
+# Grafana 13+ auto-creates empty datasource instances for built-in plugins and
+# legacy volumes may contain read-only provisioned datasources with different UIDs.
+# Delete ALL existing datasources (by ID, which bypasses read-only flags) so we can
+# create a single correctly-configured datasource with the UID our dashboards expect.
+echo "Deleting all existing datasources (clean slate)..."
+for _id in $(curl -s "http://admin:${GF_SECURITY_ADMIN_PASSWORD}@localhost:3000/api/datasources" 2>/dev/null \
+  | grep -o '"id":[0-9]*' | sed 's/"id"://g'); do
+  curl -s -X DELETE "http://admin:${GF_SECURITY_ADMIN_PASSWORD}@localhost:3000/api/datasources/${_id}" 2>&1 || true
+done
+sleep 2
+
 # Create datasource via API (both MySQL and PostgreSQL)
 PAYLOAD_FILE="/tmp/datasource-api.json"
 
@@ -177,10 +188,6 @@ if [ "$MODE" = "mysql" ]; then
 }
 APIJSON
 
-  echo "Deleting old MySQL datasources..."
-  curl -s -X DELETE "http://admin:${GF_SECURITY_ADMIN_PASSWORD}@localhost:3000/api/datasources/name/mysql" 2>&1 || true
-  curl -s -X DELETE "http://admin:${GF_SECURITY_ADMIN_PASSWORD}@localhost:3000/api/datasources/uid/devlake-mysql-api" 2>&1 || true
-  sleep 2
 
 else
   SSL_MODE="${DATABASE_SSL_MODE:-disable}"
@@ -188,7 +195,7 @@ else
 {
   "uid": "devlake-postgres-api",
   "name": "postgresql",
-  "type": "postgres",
+  "type": "grafana-postgresql-datasource",
   "url": "${POSTGRES_URL}",
   "database": "${POSTGRES_DATABASE}",
   "user": "${POSTGRES_USER}",
@@ -197,13 +204,15 @@ else
   },
   "jsonData": {
     "sslmode": "${SSL_MODE}",
-    "postgresVersion": 1400
+    "postgresVersion": 1800,
+    "database": "${POSTGRES_DATABASE}"
   },
   "access": "proxy",
   "isDefault": true,
   "editable": true
 }
 APIJSON
+
 
 fi
 
