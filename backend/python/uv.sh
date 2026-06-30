@@ -53,6 +53,13 @@ sync_project() {
     uv venv --python "${DEVLAKE_PYTHON_VERSION:-3.11}" .venv
   fi
   uv pip install --python .venv/bin/python -e .
+  # Force-reinstall local path dependencies so source changes are always
+  # picked up (uv caches them by version which stays 0.1.0 during dev).
+  for dep_dir in $(sed -n 's/.*path *= *"\([^"]*\)".*/\1/p' pyproject.toml 2>/dev/null); do
+    if [ -d "$dep_dir" ]; then
+      uv pip install --python .venv/bin/python --reinstall-package "$(basename "$dep_dir")" -e "$dep_dir"
+    fi
+  done
 }
 
 ensure_project_python() {

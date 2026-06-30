@@ -29,7 +29,7 @@ class FakePipelineStream(Stream):
 
     def collect(self, state, context):
         for p in self.generate_fake_pipelines():
-            yield json.loads(p.json()), {}
+            yield json.loads(p.model_dump_json()), {}
 
     def convert(self, pipeline: FakePipeline, ctx):
         env = ctx.scope_config.env

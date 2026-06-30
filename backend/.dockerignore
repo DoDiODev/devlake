@@ -3,6 +3,9 @@
 # build context and the builder layer, which can exhaust the Docker VM and crash BuildKit.
 bin/
 
+# Generated mocks (regenerated via make mock inside the image)
+mocks/
+
 # Runtime logs
 logs/
 

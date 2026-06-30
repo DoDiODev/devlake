@@ -23,22 +23,22 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.12"
-sqlmodel = "^0.0.8"
+sqlmodel = "^0.0.38"
 mysqlclient = "^2.1.1"
 requests = "^2.28.1"
-inflect = "^6.0.2"
-fire = "^0.4.0"
-pydantic = "^1.10.2"
+inflect = "^7.5"
+fire = "^0.7"
+pydantic = "^2.13"
 pydevd-pycharm = "^231.6471.3"
-pytest = "^7.2.2"
+pytest = "^9.1"
 jsonref = "^1.1.0"
 psycopg2 = "^2.9.5"
-jsonpointer = "^2.3"
+jsonpointer = "^3.1"
 certifi = "^2023.7.22"
 
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^7.2.0"
+pytest = "^9.1"
 
 [build-system]
 requires = ["poetry-core"]
