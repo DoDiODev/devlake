@@ -46,7 +46,7 @@ const ModalTitle = styled.div`
 
 interface Props {
   plugin: string;
-  onCreate: (plugin: string) => void;
+  onCreate: () => void;
 }
 
 export const ConnectionList = ({ plugin, onCreate }: Props) => {
@@ -113,7 +113,7 @@ export const ConnectionList = ({ plugin, onCreate }: Props) => {
         dataSource={connections}
         pagination={false}
       />
-      <Button style={{ marginTop: 16 }} type="primary" icon={<PlusOutlined />} onClick={() => onCreate(plugin)}>
+      <Button style={{ marginTop: 16 }} type="primary" icon={<PlusOutlined />} onClick={() => onCreate()}>
         Create a New Connection
       </Button>
       <Modal
