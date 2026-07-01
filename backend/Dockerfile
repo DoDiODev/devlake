@@ -61,21 +61,42 @@ COPY --from=debian-arm64 /usr/lib/aarch64-linux-gnu /rootfs-arm64/usr/lib/aarch6
 COPY --from=debian-arm64 /lib/aarch64-linux-gnu /rootfs-arm64/lib/aarch64-linux-gnu
 
 
-RUN for arch in aarch64 x86_64 ; do \
+RUN rm -f \
+        /rootfs-amd64/usr/lib/x86_64-linux-gnu/libz.a \
+        /rootfs-amd64/usr/lib/x86_64-linux-gnu/libssl.a \
+        /rootfs-amd64/usr/lib/x86_64-linux-gnu/libcrypto.a \
+        /rootfs-amd64/usr/lib/x86_64-linux-gnu/libssh2.a \
+        /rootfs-amd64/lib/x86_64-linux-gnu/libz.a \
+        /rootfs-amd64/lib/x86_64-linux-gnu/libssl.a \
+        /rootfs-amd64/lib/x86_64-linux-gnu/libcrypto.a \
+        /rootfs-amd64/lib/x86_64-linux-gnu/libssh2.a \
+        /rootfs-arm64/usr/lib/aarch64-linux-gnu/libz.a \
+        /rootfs-arm64/usr/lib/aarch64-linux-gnu/libssl.a \
+        /rootfs-arm64/usr/lib/aarch64-linux-gnu/libcrypto.a \
+        /rootfs-arm64/usr/lib/aarch64-linux-gnu/libssh2.a \
+        /rootfs-arm64/lib/aarch64-linux-gnu/libz.a \
+        /rootfs-arm64/lib/aarch64-linux-gnu/libssl.a \
+        /rootfs-arm64/lib/aarch64-linux-gnu/libcrypto.a \
+        /rootfs-arm64/lib/aarch64-linux-gnu/libssh2.a && \
+    for arch in aarch64 x86_64 ; do \
         mkdir -p /tmp/build/${arch} && cd /tmp/build/${arch} && \
-        wget https://github.com/libgit2/libgit2/archive/refs/tags/v1.3.0.tar.gz -O - | tar -xz && \
-        cd libgit2-1.3.0 && \
+        wget https://github.com/libgit2/libgit2/archive/refs/tags/v1.3.2.tar.gz -O - | tar -xz && \
+        cd libgit2-1.3.2 && \
         mkdir build && cd build && \
         if [ "$arch" = "aarch64" ] ; then \
             cmake .. -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
                 -DBUILD_SHARED_LIBS=ON -DCMAKE_SYSROOT=/rootfs-arm64 \
-                -DCMAKE_INSTALL_PREFIX=/usr/local/deps/${arch} ; \
+                -DCMAKE_INSTALL_PREFIX=/usr/local/deps/${arch} \
+                -DBUILD_CLAR=OFF -DBUILD_CLI=OFF \
+                -DCMAKE_FIND_LIBRARY_SUFFIXES=.so ; \
         elif [ "$arch" = "x86_64" ] ; then \
             cmake .. -DCMAKE_C_COMPILER=x86_64-linux-gnu-gcc \
                 -DBUILD_SHARED_LIBS=ON -DCMAKE_SYSROOT=/rootfs-amd64 \
-                -DCMAKE_INSTALL_PREFIX=/usr/local/deps/${arch} ; \
+                -DCMAKE_INSTALL_PREFIX=/usr/local/deps/${arch} \
+                -DBUILD_CLAR=OFF -DBUILD_CLI=OFF \
+                -DCMAKE_FIND_LIBRARY_SUFFIXES=.so ; \
         fi && \
-        make -j install ; \
+        make -j$(nproc) install ; \
     done
 
 
