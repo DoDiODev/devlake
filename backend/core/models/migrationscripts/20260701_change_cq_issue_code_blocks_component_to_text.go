@@ -28,7 +28,14 @@ var _ plugin.MigrationScript = (*changeCqIssueCodeBlocksComponentToText)(nil)
 type changeCqIssueCodeBlocksComponentToText struct{}
 
 func (script *changeCqIssueCodeBlocksComponentToText) Up(basicRes context.BasicRes) errors.Error {
-	return basicRes.GetDal().ModifyColumnType("cq_issue_code_blocks", "component", "text")
+	db := basicRes.GetDal()
+	// Drop the index on component first, since MySQL does not allow TEXT columns in indexes without a key length
+	err := db.Exec("DROP INDEX idx_cq_issue_code_blocks_component ON cq_issue_code_blocks")
+	if err != nil {
+		// Ignore error if index does not exist (e.g. PostgreSQL or already dropped)
+		basicRes.GetLogger().Warn(err, "failed to drop index idx_cq_issue_code_blocks_component (may not exist)")
+	}
+	return db.ModifyColumnType("cq_issue_code_blocks", "component", "text")
 }
 
 func (*changeCqIssueCodeBlocksComponentToText) Version() uint64 {
