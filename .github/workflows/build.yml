@@ -19,7 +19,7 @@ name: Build-Images-Push-Docker
 env:
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USER }}
   DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-  DEVLAKE_BACKEND_DOCKERFILE: ./backend/Dockerfile.server
+  DEVLAKE_BACKEND_DOCKERFILE: ./backend/Dockerfile
   DEVLAKE_CONFIG_UI_DOCKERFILE: ./config-ui/Dockerfile
   DEVLAKE_GRAFANA_DOCKERFILE: ./grafana/Dockerfile
 on:
