@@ -144,14 +144,8 @@ func All() []plugin.MigrationScript {
 		new(fixNullPriority),
 		new(modifyCicdDeploymentsToText),
 		new(increaseCqIssuesProjectKeyLength),
-<<<<<<< HEAD
 		new(addAuthSessions),
 		new(changeIssueComponentToText),
+		new(changeCqIssueCodeBlocksComponentToText),
 	}
-=======
-                new(addAuthSessions),
-                new(changeIssueComponentToText),
-                new(changeCqIssueCodeBlocksComponentToText),
-        }
->>>>>>> f25d3cd44 (fix(sonarqube): change component column to TEXT to prevent truncation)
 }
