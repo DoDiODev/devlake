@@ -169,5 +169,8 @@ venv
 /backend/plugins/gitextractor/parser/demo_repo/
 
 __debug_bin*
-/scripts-local/
-
+scripts-local/
+/e2e/package-lock.json
+/e2e/test-results
+/e2e/playwright-report
+/backend/python/.devlake-python-build-root
