@@ -31,6 +31,7 @@ Apache DevLake is a dev data platform that ingests data from DevOps tools (GitHu
 - **backend/python/**: Python plugin framework via RPC
 - **config-ui/**: React frontend (TypeScript, Vite, Ant Design)
 - **grafana/**: Dashboard definitions
+- **e2e/**: Top-level Playwright end-to-end tests (`qdev-full-flow.spec.ts`, `render-smoke.spec.ts`)
 
 ## Plugin Development (Go)
 
@@ -89,6 +90,13 @@ var CollectIssuesMeta = plugin.SubTaskMeta{
 - Use `helper.NewStatefulApiCollector` for incremental collection with time-based bookmarking
 - See [backend/plugins/gitlab/tasks/issue_collector.go](backend/plugins/gitlab/tasks/issue_collector.go)
 
+### Custom Plugin: q_dev (AWS Q Developer)
+[backend/plugins/q_dev/](backend/plugins/q_dev/) is a fork-specific plugin that collects Amazon Q Developer
+usage metrics from **AWS S3** (not a REST API). Scoping is S3 prefix-based (`QDevS3Slice`/`QDevS3FileMeta`
+with year/month partitioning) rather than domain-layer scopes. Models: `QDevConnection`, `QDevUserData`,
+`QDevUserReport`, `QDevChatLog`, `QDevCompletionLog`. It implements `PluginInit` and
+`DataSourcePluginBlueprintV200`. A LocalStack S3 mock can be used for local/E2E runs.
+
 ### Migration Scripts
 - Located in `models/migrationscripts/`
 - Register all scripts in `register.go`'s `All()` function
@@ -117,10 +125,13 @@ make e2e-test-go-plugins    # Run E2E tests for Go plugins only
 
 ### Running Locally
 ```bash
-docker-compose -f docker-compose-dev.yml up mysql grafana  # Start deps
+# MySQL stack (docker-compose-dev.yml does NOT exist - use the DB-specific files)
+docker-compose -f docker-compose-dev-mysql.yml up mysql grafana       # MySQL + Grafana
+docker-compose -f docker-compose-dev-postgresql.yml up postgres grafana  # or PostgreSQL + Grafana
 make dev                                                     # Run server on :8080
 cd config-ui && yarn && yarn start                          # UI on :4000
 ```
+
 
 ## Testing
 
@@ -129,6 +140,10 @@ Place `*_test.go` files alongside source. Use mocks from `backend/mocks/`. Mocks
 
 ### E2E Tests for Plugins
 Use CSV fixtures in `e2e/` directory. See [backend/test/helper/](backend/test/helper/) for the Go test client that can spin up an in-memory DevLake instance.
+
+### Playwright E2E (full flow)
+The top-level [e2e/](e2e/) directory holds Playwright browser tests against a running stack. Open the
+report with `cd e2e && npx playwright show-report`.
 
 ### Integration Testing
 ```go
@@ -145,6 +160,7 @@ Run `make migration-script-lint` from `backend/` to validate all migration scrip
 
 ## Python Plugins
 Located in `backend/python/plugins/`. Use Poetry for dependencies. See [backend/python/README.md](backend/python/README.md).
+Python is pinned to **3.11** (Pydantic v1 + `dbt-mysql` 1.7 block 3.12+).
 
 ## Code Conventions
 - Tool model table names: `_tool_<plugin>_<entity>` (e.g., `_tool_gitlab_issues`)

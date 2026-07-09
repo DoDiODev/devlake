@@ -50,7 +50,7 @@ RUN if [ "$(arch)" != "x86_64" ] ; then \
     fi
 
 RUN go install github.com/vektra/mockery/v2@v2.53.6
-RUN go install github.com/swaggo/swag/cmd/swag@v1.16.6
+RUN go install github.com/swaggo/swag/cmd/swag@v1.16.1
 
 COPY --from=debian-amd64 /usr/include /rootfs-amd64/usr/include
 COPY --from=debian-amd64 /usr/lib/x86_64-linux-gnu /rootfs-amd64/usr/lib/x86_64-linux-gnu
@@ -113,7 +113,7 @@ RUN cd /usr/local/deps/target/lib && \
     done
 
 
-FROM python:3.11-slim-bookworm as base
+FROM python:3.9-slim-bookworm as base
 
 RUN apt-get update && \
     apt-get install -y python3-dev python3-pip tar pkg-config curl libssh2-1 zlib1g libffi-dev default-libmysqlclient-dev libpq-dev tini git openssh-client corkscrew && \
@@ -181,74 +181,4 @@ USER devlake
 #add tini, prevent zombie process
 ENTRYPOINT ["/usr/bin/tini", "--"]
 
-CMD ["lake"]    libssh2-1-dev \
-    libssl-dev \
-    zlib1g-dev
-
-# Install libgit2 for native platform only
-RUN mkdir -p /tmp/build && cd /tmp/build && \
-    wget https://github.com/libgit2/libgit2/archive/refs/tags/v1.3.0.tar.gz -O - | tar -xz && \
-    cd libgit2-1.3.0 && \
-    mkdir build && cd build && \
-    cmake .. -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=/usr/local && \
-    make -j$(nproc) install && \
-    ldconfig
-
-RUN go install github.com/vektra/mockery/v2@v2.53.6
-RUN go install github.com/swaggo/swag/cmd/swag@v1.16.6
-
-WORKDIR /app
-
-# Cache Go module downloads in a separate layer (only re-runs when go.mod/go.sum change)
-COPY go.mod go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod \
-    go mod download
-
-# Now copy the rest of the source
-COPY . /app
-ENV GOBIN=/app/bin
-
-ARG TAG=
-ARG SHA=
-
-# Generate mocks and swagger (use build cache to speed up swag)
-RUN --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/go/pkg/mod \
-    make mock
-RUN --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/go/pkg/mod \
-    make swag
-
-# Build plugins (parallel, with persistent Go build cache)
-RUN --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/go/pkg/mod \
-    make build-plugin
-
-# Build server
-RUN --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/go/pkg/mod \
-    VERSION=${TAG}@${SHA} make build-server
-
-FROM debian:bookworm-slim
-
-RUN apt-get update && apt-get install -y \
-    libssh2-1 \
-    libssl3 \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy libgit2
-COPY --from=builder /usr/local/lib/libgit2.so* /usr/local/lib/
-RUN ldconfig
-
-WORKDIR /app
-
-COPY --from=builder /app/bin ./bin
-
-# Create empty python plugins dir to avoid startup error
-RUN mkdir -p python/plugins
-
-ENV PORT=8080
-EXPOSE 8080
-
-CMD ["./bin/lake"]
+CMD ["lake"]
