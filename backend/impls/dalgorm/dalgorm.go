@@ -452,9 +452,18 @@ func (d *Dalgorm) RenameTable(oldName, newName string) errors.Error {
 
 // DropIndexes drops indexes for specified table
 func (d *Dalgorm) DropIndexes(table string, indexNames ...string) errors.Error {
+	migrator := d.db.Migrator()
 	for _, indexName := range indexNames {
-		err := d.db.Migrator().DropIndex(table, indexName)
-		if err != nil {
+		// Skip indexes that are not present so the operation is idempotent and
+		// database-neutral. GORM's DropIndex emits a bare `DROP INDEX` (without
+		// `IF EXISTS`), which makes PostgreSQL fail with SQLSTATE 42704 when the
+		// index is missing (e.g. it was already removed by an earlier column
+		// rewrite). Guarding with HasIndex keeps genuine errors from being
+		// swallowed while making repeated/partial migrations safe.
+		if !migrator.HasIndex(table, indexName) {
+			continue
+		}
+		if err := migrator.DropIndex(table, indexName); err != nil {
 			return d.convertGormError(err)
 		}
 	}
