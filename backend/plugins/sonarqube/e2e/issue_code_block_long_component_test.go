@@ -18,139 +18,182 @@ limitations under the License.
 package e2e
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/apache/incubator-devlake/core/models/common"
+	"github.com/apache/incubator-devlake/core/models/domainlayer"
 	"github.com/apache/incubator-devlake/core/models/domainlayer/codequality"
+	coremigrations "github.com/apache/incubator-devlake/core/models/migrationscripts"
+	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/helpers/e2ehelper"
+	implcontext "github.com/apache/incubator-devlake/impls/context"
 	"github.com/apache/incubator-devlake/plugins/sonarqube/impl"
 	"github.com/apache/incubator-devlake/plugins/sonarqube/models"
+	sonarqubemigrations "github.com/apache/incubator-devlake/plugins/sonarqube/models/migrationscripts"
 	"github.com/apache/incubator-devlake/plugins/sonarqube/tasks"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// TestSonarqubeIssueCodeBlockLongComponent verifies that the convertIssueCodeBlocks
-// subtask can handle component paths longer than 256 and 500 characters without
-// producing "Data too long for column 'component'" errors.
-//
-// This test reproduces the original bug:
-//
-//	Error 1406 (22001): Data too long for column 'component' at row 91
-//
-// The fix changed both tool layer and domain layer `component` columns to TEXT type.
+type sonarqubeIssueCodeBlockBeforeText struct {
+	ConnectionId uint64 `gorm:"primaryKey"`
+	Id           string `gorm:"primaryKey"`
+	IssueKey     string `gorm:"index"`
+	Component    string `gorm:"index;type:varchar(500)"`
+	StartLine    int
+	EndLine      int
+	StartOffset  int
+	EndOffset    int
+	Msg          string
+	common.NoPKModel
+}
+
+func (sonarqubeIssueCodeBlockBeforeText) TableName() string {
+	return "_tool_sonarqube_issue_code_blocks"
+}
+
+type cqIssueCodeBlockBeforeText struct {
+	domainlayer.DomainEntity
+	IssueKey    string `json:"key" gorm:"index"`
+	Component   string `gorm:"index"`
+	StartLine   int
+	EndLine     int
+	StartOffset int
+	EndOffset   int
+	Msg         string
+}
+
+func (cqIssueCodeBlockBeforeText) TableName() string {
+	return "cq_issue_code_blocks"
+}
+
 func TestSonarqubeIssueCodeBlockLongComponent(t *testing.T) {
 	var sonarqube impl.Sonarqube
 	dataflowTester := e2ehelper.NewDataFlowTester(t, "sonarqube", sonarqube)
-
-	// Migrate the tables to get the current schema (with TEXT type for component)
 	dataflowTester.FlushTabler(&models.SonarqubeIssue{})
-	dataflowTester.FlushTabler(&models.SonarqubeIssueCodeBlock{})
-	dataflowTester.FlushTabler(&codequality.CqIssueCodeBlock{})
+	require.NoError(t, dataflowTester.Db.Migrator().DropTable(
+		&sonarqubeIssueCodeBlockBeforeText{},
+		&cqIssueCodeBlockBeforeText{},
+	))
+	require.NoError(t, dataflowTester.Db.AutoMigrate(
+		&sonarqubeIssueCodeBlockBeforeText{},
+		&cqIssueCodeBlockBeforeText{},
+	))
 
-	// Create a component path that exceeds 256 chars (old GORM default varchar limit)
-	longComponent256 := "my-org_my-project-key:src/main/java/com/myorganization/myapplication/services/implementations/deeply/nested/package/structure/subpackage/another/level/of/nesting/MyVeryLongServiceImplementationClassNameThatExceedsThe256CharacterLimit.java"
-	assert.Greater(t, len(longComponent256), 256)
+	existingComponent := "existing:component"
+	require.NoError(t, dataflowTester.Db.Create(&sonarqubeIssueCodeBlockBeforeText{
+		ConnectionId: 1,
+		Id:           "existing-tool-block",
+		IssueKey:     "existing-issue",
+		Component:    existingComponent,
+	}).Error)
+	require.NoError(t, dataflowTester.Db.Create(&cqIssueCodeBlockBeforeText{
+		DomainEntity: domainlayer.DomainEntity{Id: "existing-domain-block"},
+		IssueKey:     "existing-domain-issue",
+		Component:    existingComponent,
+	}).Error)
 
-	// Create a component path that exceeds 500 chars (previous varchar(500) limit)
-	longComponent500 := "my-organization_my-extremely-long-project-name-with-feature-branch:" +
-		"src/main/java/com/enterprise/application/modules/customer/services/implementations/" +
-		"internal/validation/rules/complex/nested/deeply/structured/package/hierarchy/" +
-		"subsystem/core/domain/entities/aggregates/valueobjects/specifications/" +
-		"MyExtremelyLongAndDescriptiveClassNameForAnEnterpriseApplicationServiceImplementation" +
-		"ThatFollowsAllNamingConventionsAndExceedsReasonableLimits.java"
-	assert.Greater(t, len(longComponent500), 500)
+	basicRes := implcontext.NewDefaultBasicRes(dataflowTester.Cfg, dataflowTester.Log, dataflowTester.Dal)
+	runMigration(t, coremigrations.All(), "change cq_issue_code_blocks.component type to text", basicRes)
+	runMigration(t, sonarqubemigrations.All(), "change _tool_sonarqube_issue_code_blocks.component type to text", basicRes)
+	assertTextColumnWithoutIndex(t, dataflowTester, "cq_issue_code_blocks")
+	assertTextColumnWithoutIndex(t, dataflowTester, "_tool_sonarqube_issue_code_blocks")
 
-	// Insert test issue (needed for the JOIN in the converter)
+	var migratedToolBlock sonarqubeIssueCodeBlockBeforeText
+	require.NoError(t, dataflowTester.Db.First(&migratedToolBlock, "id = ?", "existing-tool-block").Error)
+	require.Equal(t, existingComponent, migratedToolBlock.Component)
+	var migratedDomainBlock cqIssueCodeBlockBeforeText
+	require.NoError(t, dataflowTester.Db.First(&migratedDomainBlock, "id = ?", "existing-domain-block").Error)
+	require.Equal(t, existingComponent, migratedDomainBlock.Component)
+	require.NoError(t, dataflowTester.Db.Delete(&migratedToolBlock).Error)
+	require.NoError(t, dataflowTester.Db.Delete(&migratedDomainBlock).Error)
+
+	longComponent256 := "project:" + strings.Repeat("a", 256)
+	longComponent500 := "project:" + strings.Repeat("b", 500)
+	require.Greater(t, len(longComponent256), 256)
+	require.Greater(t, len(longComponent500), 500)
+
 	issueKey := "TEST-LONG-COMPONENT-ISSUE"
 	projectKey := "test-long-component-project"
-	testIssue := &models.SonarqubeIssue{
+	result := dataflowTester.Db.Create(&models.SonarqubeIssue{
 		ConnectionId: 1,
 		IssueKey:     issueKey,
 		ProjectKey:   projectKey,
 		Component:    longComponent500,
 		Rule:         "java:S3776",
 		Severity:     "CRITICAL",
-	}
-	result := dataflowTester.Db.Create(testIssue)
-	assert.NoError(t, result.Error, "inserting issue with long component should succeed")
+	})
+	require.NoError(t, result.Error)
 
-	// Insert code blocks with long component paths
 	codeBlocks := []*models.SonarqubeIssueCodeBlock{
 		{
 			ConnectionId: 1,
 			Id:           "test-long-component-block-256",
 			IssueKey:     issueKey,
 			Component:    longComponent256,
-			StartLine:    10,
-			EndLine:      20,
-			StartOffset:  0,
-			EndOffset:    50,
-			Msg:          "Test message for component > 256 chars",
+			Msg:          "component longer than 256 characters",
 		},
 		{
 			ConnectionId: 1,
 			Id:           "test-long-component-block-500",
 			IssueKey:     issueKey,
 			Component:    longComponent500,
-			StartLine:    42,
-			EndLine:      42,
-			StartOffset:  5,
-			EndOffset:    80,
-			Msg:          "Test message for component > 500 chars",
+			Msg:          "component longer than 500 characters",
 		},
 	}
 	for _, block := range codeBlocks {
-		result := dataflowTester.Db.Create(block)
-		assert.NoError(t, result.Error, "inserting code block with long component should succeed (tool layer)")
+		require.NoError(t, dataflowTester.Db.Create(block).Error)
 	}
 
-	// Run the converter subtask - this is where the original error occurred
-	taskData := &tasks.SonarqubeTaskData{
+	dataflowTester.Subtask(tasks.ConvertIssueCodeBlocksMeta, &tasks.SonarqubeTaskData{
 		Options: &tasks.SonarqubeOptions{
 			ConnectionId: 1,
 			ProjectKey:   projectKey,
 		},
 		TaskStartTime: time.Now(),
-	}
+	})
 
-	// This would fail with the old schema:
-	// Error 1406 (22001): Data too long for column 'component' at row N
-	dataflowTester.Subtask(tasks.ConvertIssueCodeBlocksMeta, taskData)
-
-	// Verify the converted domain layer records have the full component path
 	var domainBlocks []codequality.CqIssueCodeBlock
-	result = dataflowTester.Db.Find(&domainBlocks)
-	assert.NoError(t, result.Error)
-	assert.GreaterOrEqual(t, len(domainBlocks), 2, "should have at least 2 converted code blocks")
+	require.NoError(t, dataflowTester.Db.Find(&domainBlocks).Error)
+	require.Len(t, domainBlocks, 2)
+	require.ElementsMatch(t,
+		[]string{longComponent256, longComponent500},
+		[]string{domainBlocks[0].Component, domainBlocks[1].Component},
+	)
 
-	// Verify the long component values were preserved without truncation
-	foundLong256 := false
-	foundLong500 := false
-	for _, block := range domainBlocks {
-		if block.Component == longComponent256 {
-			foundLong256 = true
-			assert.Equal(t, "Test message for component > 256 chars", block.Msg)
-		}
-		if block.Component == longComponent500 {
-			foundLong500 = true
-			assert.Equal(t, "Test message for component > 500 chars", block.Msg)
-		}
-	}
-	assert.True(t, foundLong256, "domain layer should contain the 256+ char component without truncation")
-	assert.True(t, foundLong500, "domain layer should contain the 500+ char component without truncation")
-
-	// Also verify the tool layer stored the values correctly
 	var toolBlocks []models.SonarqubeIssueCodeBlock
-	result = dataflowTester.Db.Where("connection_id = ? AND issue_key = ?", 1, issueKey).Find(&toolBlocks)
-	assert.NoError(t, result.Error)
-	assert.Equal(t, 2, len(toolBlocks))
-	for _, block := range toolBlocks {
-		assert.True(t, len(block.Component) > 256,
-			"tool layer component should not be truncated")
-	}
-
-	// Cleanup - ignore NoPKModel fields in verification
-	_ = common.NoPKModel{}
+	require.NoError(t, dataflowTester.Db.Where(
+		"connection_id = ? AND issue_key = ?", 1, issueKey,
+	).Find(&toolBlocks).Error)
+	require.Len(t, toolBlocks, 2)
+	require.ElementsMatch(t,
+		[]string{longComponent256, longComponent500},
+		[]string{toolBlocks[0].Component, toolBlocks[1].Component},
+	)
 }
 
+func runMigration(t *testing.T, scripts []plugin.MigrationScript, name string, basicRes *implcontext.DefaultBasicRes) {
+	t.Helper()
+	for _, script := range scripts {
+		if script.Name() == name {
+			require.NoError(t, script.Up(basicRes))
+			return
+		}
+	}
+	require.Fail(t, "migration is not registered", name)
+}
+
+func assertTextColumnWithoutIndex(t *testing.T, dataflowTester *e2ehelper.DataFlowTester, table string) {
+	t.Helper()
+	columnTypes, err := dataflowTester.Db.Migrator().ColumnTypes(table)
+	require.NoError(t, err)
+	for _, columnType := range columnTypes {
+		if columnType.Name() == "component" {
+			require.Contains(t, strings.ToLower(columnType.DatabaseTypeName()), "text")
+			require.False(t, dataflowTester.Db.Migrator().HasIndex(table, "idx_"+table+"_component"))
+			return
+		}
+	}
+	require.Fail(t, "component column not found", table)
+}

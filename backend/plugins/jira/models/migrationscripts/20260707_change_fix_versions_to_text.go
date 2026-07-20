@@ -44,4 +44,3 @@ func (*changeFixVersionsToText20260707) Version() uint64 {
 func (*changeFixVersionsToText20260707) Name() string {
 	return "change fix_versions type to text in _tool_jira_issues"
 }
-

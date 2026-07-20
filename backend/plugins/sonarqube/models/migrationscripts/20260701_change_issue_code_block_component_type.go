@@ -29,10 +29,8 @@ type changeIssueCodeBlockComponentType struct{}
 
 func (script *changeIssueCodeBlockComponentType) Up(basicRes context.BasicRes) errors.Error {
 	db := basicRes.GetDal()
-	// Try to drop the index; ignore error if it does not exist
-	err := db.Exec("DROP INDEX idx__tool_sonarqube_issue_code_blocks_component ON _tool_sonarqube_issue_code_blocks")
-	if err != nil {
-		basicRes.GetLogger().Warn(err, "failed to drop index on component (may not exist)")
+	if err := db.DropIndexes("_tool_sonarqube_issue_code_blocks", "idx__tool_sonarqube_issue_code_blocks_component"); err != nil {
+		return err
 	}
 	return db.ModifyColumnType("_tool_sonarqube_issue_code_blocks", "component", "text")
 }
@@ -44,4 +42,3 @@ func (*changeIssueCodeBlockComponentType) Version() uint64 {
 func (*changeIssueCodeBlockComponentType) Name() string {
 	return "change _tool_sonarqube_issue_code_blocks.component type to text"
 }
-

@@ -27,14 +27,13 @@ var _ plugin.MigrationScript = (*changeIssueComponentToText)(nil)
 
 type changeIssueComponentToText struct{}
 
-func (script *changeIssueComponentToText) Up(basicRes context.BasicRes) errors.Error {
-	// the previous script (20240813) targeted the non-existent "components" column,
-	// the actual column is the singular "component" which stayed varchar(255).
+func (*changeIssueComponentToText) Up(basicRes context.BasicRes) errors.Error {
+	// The 20240813 migration targeted the non-existent plural "components" column.
 	return basicRes.GetDal().ModifyColumnType("issues", "component", "text")
 }
 
 func (*changeIssueComponentToText) Version() uint64 {
-	return 20250629120000
+	return 20260629120000
 }
 
 func (*changeIssueComponentToText) Name() string {
