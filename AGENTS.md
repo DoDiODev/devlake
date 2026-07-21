@@ -91,11 +91,15 @@ var CollectIssuesMeta = plugin.SubTaskMeta{
 - See [backend/plugins/gitlab/tasks/issue_collector.go](backend/plugins/gitlab/tasks/issue_collector.go)
 
 ### Custom Plugin: q_dev (AWS Q Developer)
-[backend/plugins/q_dev/](backend/plugins/q_dev/) is a fork-specific plugin that collects Amazon Q Developer
+[backend/plugins/q_dev/](backend/plugins/q_dev/) is an upstream plugin (present and
+identical in `apache/devlake` `main`; verified 2026-07-21 — **not** a fork-only
+artifact) that collects Amazon Q Developer
 usage metrics from **AWS S3** (not a REST API). Scoping is S3 prefix-based (`QDevS3Slice`/`QDevS3FileMeta`
 with year/month partitioning) rather than domain-layer scopes. Models: `QDevConnection`, `QDevUserData`,
 `QDevUserReport`, `QDevChatLog`, `QDevCompletionLog`. It implements `PluginInit` and
 `DataSourcePluginBlueprintV200`. A LocalStack S3 mock can be used for local/E2E runs.
+It still uses `aws-sdk-go` v1 (migration to aws-sdk-go-v2 tracked as a regular
+upstream change, not fork-only).
 
 ### Migration Scripts
 - Located in `models/migrationscripts/`
