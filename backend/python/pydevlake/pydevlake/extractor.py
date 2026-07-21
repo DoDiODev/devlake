@@ -81,4 +81,7 @@ def autoextract(json: dict, model_cls: Type[ToolModel]) -> ToolModel:
             alias = field_info.alias
             value = json.get(field_name) or json.get(alias) if alias else json.get(field_name)
         attributes[field_name] = value
-    return model_cls(**attributes)
+    # Use model_validate so values are coerced (e.g. str -> datetime/Enum).
+    # SQLModel table=True models skip validation on __init__, which would leave
+    # raw strings uncoerced under Pydantic v2, so validate explicitly here.
+    return model_cls.model_validate(attributes)

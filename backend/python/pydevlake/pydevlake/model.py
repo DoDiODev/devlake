@@ -161,7 +161,7 @@ class ToolModel(ToolTable, NoPKModel):
 
 
 class DomainModel(NoPKModel):
-    id: Optional[str] = Field(primary_key=True)
+    id: Optional[str] = Field(default=None, primary_key=True)
 
 
 class ToolScope(ToolModel):
@@ -214,5 +214,5 @@ class SubtaskRun(SQLModel, table=True):
     subtask_name: str
     connection_id: int
     started: datetime
-    completed: Optional[datetime]
+    completed: Optional[datetime] = None
     state: str = Field(sa_type=Text())  # JSON encoded dict of atomic values
