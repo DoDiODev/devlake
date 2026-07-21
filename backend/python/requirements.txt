@@ -1,5 +1,5 @@
 # runtime dependencies
-setuptools
-wheel
-dbt-mysql
-dbt-postgres
+setuptools==82.0.1
+wheel==0.47.0
+dbt-mysql==1.7.0
+dbt-postgres==1.7.19

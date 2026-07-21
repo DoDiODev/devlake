@@ -63,6 +63,15 @@ def make_context(connection, scope, scope_config):
     )
 
 
+def _revalidate(model):
+    # Under Pydantic v2, SQLModel table models don't coerce field values on
+    # construction. Expected models built from raw values (e.g. date strings)
+    # therefore keep their raw type, while converted results are already
+    # coerced. Re-validating normalizes the field types on both sides so the
+    # comparison behaves like it did under Pydantic v1.
+    return type(model).model_validate(model.model_dump(warnings=False))
+
+
 def assert_stream_convert(plugin: Union[Plugin, Type[Plugin]], stream_name: str,
                    raw: dict, expected: Union[DomainModel, Iterable[DomainModel]],
                    ctx=None):
@@ -82,7 +91,7 @@ def assert_stream_convert(plugin: Union[Plugin, Type[Plugin]], stream_name: str,
                 hasattr(exp, "__getitem__") and exp[0] == "updated_at"):
             pass
         else:
-            assert res == exp
+            assert _revalidate(res) == _revalidate(exp)
 
 
 def assert_stream_run(stream: Stream, connection: Connection, scope: ToolScope, scope_config: ScopeConfig):
