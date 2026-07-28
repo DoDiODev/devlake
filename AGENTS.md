@@ -190,7 +190,11 @@ Notes:
 
 ## Python Plugins
 Located in `backend/python/plugins/`. Use Poetry for dependencies. See [backend/python/README.md](backend/python/README.md).
-Python is pinned to **3.11** (Pydantic v1 + `dbt-mysql` 1.7 block 3.12+).
+Python is pinned to **3.11**. Note (verified 2026-07-28): Pydantic was migrated to
+**v2** (wave 3b.2), so the remaining blocker for a newer runtime is the
+unmaintained **`dbt-mysql` 1.7** adapter, which pins `dbt-core~=1.7.0`. That stack
+still runs on 3.13 but **breaks at runtime on 3.14**; dropping it (wave 4g) is the
+prerequisite for the Python 3.14 bump (wave 4f).
 
 ## Code Conventions
 - Tool model table names: `_tool_<plugin>_<entity>` (e.g., `_tool_gitlab_issues`)
