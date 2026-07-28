@@ -162,6 +162,32 @@ helper.ConnectLocalServer(t, &helper.LocalClientConfig{
 ### Model Validation
 Run `make migration-script-lint` from `backend/` to validate all migration scripts follow the correct format (`YYYYMMDD_description.go`).
 
+### Schema-Drift Guard (migration vs. model)
+Two e2e checks assert that the schema produced by the **real migration scripts**
+still matches what the **runtime GORM models** expect (they run the migrations
+instead of `AutoMigrate`-ing the model, which would hide drift):
+- `backend/plugins/jira/e2e/migration_schema_test.go` — Jira-specific regression
+  test for the Sprint Report `_raw_data_table` bug.
+- `backend/plugins/schema_e2e/migration_schema_test.go` — cross-plugin guard for
+  **every** built-in Go plugin, plus `TestAllGoPluginsListed`, which fails if a
+  new plugin's `impl` package is not registered in `allGoPlugins()`.
+
+Both require `E2E_DB_URL` and run under `make e2e-test-go-plugins`. A common
+cause of failure: a migration struct that forgets to embed `common.NoPKModel`,
+so the `_raw_data_*` columns are missing while the model declares them.
+
+Notes:
+- `backend/plugins/schema_e2e/` is **not** a plugin (no `main` package); it is
+  excluded in `backend/scripts/build-plugins.sh`, otherwise `make build-plugin`
+  fails with "-buildmode=plugin requires exactly one main package".
+- Both tests set a fallback `ENCRYPTION_SECRET` and call `dalgorm.Init(...)`;
+  without it migrations fail with `invalid encKey` / `invalid serializer type
+  encdec` (`runner.CreateBasicRes` does not register the serializer, only
+  `CreateAppBasicRes` does).
+- Migration scripts must not import `core/models/common` (enforced by
+  `make migration-script-lint`) — use `core/models/migrationscripts/archived`.
+
+
 ## Python Plugins
 Located in `backend/python/plugins/`. Use Poetry for dependencies. See [backend/python/README.md](backend/python/README.md).
 Python is pinned to **3.11** (Pydantic v1 + `dbt-mysql` 1.7 block 3.12+).
@@ -177,7 +203,9 @@ Python is pinned to **3.11** (Pydantic v1 + `dbt-mysql` 1.7 block 3.12+).
 
 ## Common Pitfalls
 - Forgetting to add models to `GetTablesInfo()` fails `plugins/table_info_test.go`
+- Migration structs that create a `_tool_*` table must embed `common.NoPKModel` (or `common.RawDataOrigin`) so the `_raw_data_*` columns exist — otherwise the ApiExtractor's cleanup query fails at runtime with `Unknown column '_raw_data_table'`. Guarded by the schema-drift e2e checks (see Testing → Schema-Drift Guard).
 - Migration scripts must be added to `All()` in `register.go` AND follow `YYYYMMDD_description.go` naming (validate with `make migration-script-lint`)
+- Never edit a migration script that has already shipped/run; fix schema issues with a **new** migration (append-only), since executed versions never re-run.
 - API changes require running `make swag` to update Swagger docs (this runs `make mock` first)
 - Python plugins require `libgit2` for gitextractor functionality
 - New Plugin interfaces like `PluginInit` or `PluginOpenApiSpec` are optional - only implement if needed
