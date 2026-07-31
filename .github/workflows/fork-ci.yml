@@ -38,6 +38,11 @@ on:
       - main
   workflow_dispatch:
 
+env:
+  # The `mericodev/lake-builder` image still ships Go 1.20, which cannot even
+  # download a newer toolchain. Every Go job installs the version from
+  # backend/go.mod via actions/setup-go instead.
+  GOTOOLCHAIN: auto
 concurrency:
   group: fork-ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
@@ -51,6 +56,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - run: git config --global --add safe.directory $(pwd)
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache: false
       - name: generate mock
         run: |
           go version
@@ -70,6 +80,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - run: git config --global --add safe.directory $(pwd)
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache: false
       - name: migration script linting
         run: |
           go version
@@ -84,6 +99,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - run: git config --global --add safe.directory $(pwd)
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache: false
       - name: Build Python
         run: |
           cd backend
@@ -120,6 +140,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - run: git config --global --add safe.directory $(pwd)
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache: false
       - name: Build Python
         run: |
           cd backend
