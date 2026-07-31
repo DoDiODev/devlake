@@ -1,0 +1,185 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# Fork-only CI.
+#
+# The upstream workflows (test.yml, test-e2e.yml, config-ui.yml,
+# asf-header-check.yml, ...) only trigger on `push` to `main` and on
+# `pull_request` with base `main`/`release-*`. In this fork we work on
+# feature branches (`pr/**`, `fix/**`, ...) and often stack pull requests on
+# top of each other, so those workflows never run before a PR is opened
+# upstream.
+#
+# This workflow mirrors the upstream checks for every other branch/base, so
+# CI failures show up in the fork immediately. It is deliberately guarded so
+# it never runs in `apache/devlake` should the file ever be merged upstream.
+name: fork-ci
+
+on:
+  push:
+    branches-ignore:
+      - main
+  pull_request:
+    branches-ignore:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: fork-ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  golangci-lint:
+    name: lint (go)
+    if: github.repository != 'apache/devlake'
+    runs-on: ubuntu-latest
+    container: mericodev/lake-builder:latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: git config --global --add safe.directory $(pwd)
+      - name: generate mock
+        run: |
+          go version
+          cd backend
+          make mock
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.2
+          working-directory: ./backend
+
+  migration-script-lint:
+    name: migration-script-lint
+    if: github.repository != 'apache/devlake'
+    runs-on: ubuntu-latest
+    container: mericodev/lake-builder:latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: git config --global --add safe.directory $(pwd)
+      - name: migration script linting
+        run: |
+          go version
+          cd backend
+          go run core/migration/linter/main.go -p backend $(find . -path "**/migrationscripts/**.go")
+
+  unit-test:
+    name: unit-test
+    if: github.repository != 'apache/devlake'
+    runs-on: ubuntu-latest
+    container: mericodev/lake-builder:latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: git config --global --add safe.directory $(pwd)
+      - name: Build Python
+        run: |
+          cd backend
+          make build-python
+      - name: Cache go build
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/go-build
+            ${{ env.GOPATH }}/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Unit tests
+        run: |
+          go version
+          cp env.example .env
+          cd backend
+          make unit-test
+
+  e2e-mysql:
+    name: e2e (mysql)
+    if: github.repository != 'apache/devlake'
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: mysql:8
+        env:
+          MYSQL_DATABASE: lake
+          MYSQL_USER: merico
+          MYSQL_PASSWORD: merico
+          MYSQL_ROOT_PASSWORD: root
+    container: mericodev/lake-builder:latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: git config --global --add safe.directory $(pwd)
+      - name: Build Python
+        run: |
+          cd backend
+          make build-python
+      - name: Cache go build
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/go-build
+            ${{ env.GOPATH }}/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Test-mysql
+        env:
+          DB_URL: mysql://root:root@db:3306/lake?charset=utf8mb4&parseTime=True
+          E2E_DB_URL: mysql://root:root@db:3306/lake?charset=utf8mb4&parseTime=True
+        run: |
+          go version
+          cp env.example .env
+          cd backend
+          make e2e-test-go-plugins
+          make e2e-test
+
+  config-ui:
+    name: config-ui
+    if: github.repository != 'apache/devlake'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'yarn'
+          cache-dependency-path: config-ui/yarn.lock
+      - name: Install with Yarn
+        run: cd config-ui; yarn
+      - name: Run Lint
+        run: cd config-ui; yarn tsc && yarn lint
+
+  asf-header-check:
+    name: check Apache license header
+    if: github.repository != 'apache/devlake'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check License Header
+        uses: apache/skywalking-eyes@main
+
+  grafana-dashboards-check:
+    name: check grafana dashboards
+    if: github.repository != 'apache/devlake'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check grafana dashboards whether using mysql uid
+        run: |
+          if grep '"type": "mysql"' grafana/dashboards/*; then
+              echo "There are dashboards which use mysql uid as datasource"
+              exit 1
+          fi
+
