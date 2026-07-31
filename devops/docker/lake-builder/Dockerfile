@@ -55,9 +55,13 @@ COPY --from=builder /tmp/deps/include/ /usr/include/
 ENV PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
 
 # Install Golang
-RUN curl -L https://git.io/vQhTU | bash -s -- --version 1.26.2
-RUN mv /root/go /go &&\
-    mv /root/.go /usr/local/go &&\
+# NOTE: the previous installer was fetched from `git.io`, which GitHub shut down
+# in 2022, so the image could no longer be rebuilt. Fetch the toolchain straight
+# from go.dev instead.
+ARG GO_VERSION=1.26.2
+RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tar.gz &&\
+    rm -rf /usr/local/go && tar -C /usr/local -xzf /tmp/go.tar.gz && rm /tmp/go.tar.gz &&\
+    mkdir -p /go &&\
     ln -sf /usr/local/go/bin/* /usr/bin
 
 # Install Golang Tools
@@ -67,9 +71,8 @@ RUN export GOPATH=/go &&  \
 
 # Golang Env
 ENV GOPATH=/go
-# Make sure GOROOT is unset
-ENV GOROOT=
-ENV PATH=${GOPATH}/bin:${PATH}
+ENV GOROOT=/usr/local/go
+ENV PATH=${GOPATH}/bin:${GOROOT}/bin:${PATH}
 
 # Python package manager
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_UNMANAGED_INSTALL=/usr/local/bin sh
