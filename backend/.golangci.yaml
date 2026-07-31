@@ -239,6 +239,14 @@ linters:
       - linters:
           - revive
         path: plugins/([^hc].*|.[^eo].*|..[^lr].*|...[^pe].*|....[^e].*|.....[^r].*)
+      # The q_dev plugin still uses aws-sdk-go v1, which upstream marked as
+      # deprecated (SA1019) as of its v1.55.7 release. Migrating it to
+      # aws-sdk-go-v2 is tracked separately (see TODO.md / q_dev wave); until
+      # then, suppress the deprecation noise for that plugin only.
+      - linters:
+          - staticcheck
+        text: "SA1019: .*aws-sdk-go"
+        path: plugins/q_dev/
     paths:
       - third_party$
       - builtin$
