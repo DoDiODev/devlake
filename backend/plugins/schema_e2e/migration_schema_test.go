@@ -38,6 +38,7 @@ import (
 	coreMigration "github.com/apache/incubator-devlake/core/models/migrationscripts"
 	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/core/runner"
+	"github.com/apache/incubator-devlake/helpers/e2ehelper"
 	"github.com/apache/incubator-devlake/impls/dalgorm"
 	"github.com/apache/incubator-devlake/impls/logruslog"
 	"github.com/stretchr/testify/assert"
@@ -173,28 +174,15 @@ func TestAllGoPluginsListed(t *testing.T) {
 // Tables that no migration creates (e.g. models materialized lazily at runtime)
 // are skipped, so the check specifically targets *drift* between an existing
 // table and its model — which is exactly the failure mode above.
+//
+// The migrations run against a dedicated, empty database (see
+// e2ehelper.NewIsolatedMigrationDb) because the shared e2e database is polluted
+// by the other e2e tests, which AutoMigrate tables without recording anything
+// in `_devlake_migration_history`.
 func TestMigrationSchemaMatchesModels(t *testing.T) {
-	cfg := config.GetConfig()
-	e2eDbURL := cfg.GetString("E2E_DB_URL")
-	if e2eDbURL == "" {
-		t.Skip("E2E_DB_URL is not set; skipping cross-plugin migration schema check")
-	}
-	cfg.Set("DB_URL", e2eDbURL)
-	// Some migration scripts refuse to run without an encryption secret
-	// (e.g. jira 20220716: "jira v0.11 invalid encKey"). CI does not
-	// necessarily provide one, so fall back to a deterministic test value.
-	if cfg.GetString(plugin.EncodeKeyEnvStr) == "" {
-		cfg.Set(plugin.EncodeKeyEnvStr, "schema-e2e-test-encryption-secret")
-	}
-
-	db, err := runner.NewGormDb(cfg, logruslog.Global)
-	require.NoError(t, err)
-	// register the `encdec` GORM serializer, otherwise migration scripts that
-	// touch connection models fail with "invalid serializer type encdec"
-	// (runner.CreateBasicRes does not do this, only CreateAppBasicRes does).
-	dalgorm.Init(cfg.GetString(plugin.EncodeKeyEnvStr))
+	db := e2ehelper.NewIsolatedMigrationDb(t, "schema_drift")
 	dalInstance := dalgorm.NewDalgorm(db)
-	basicRes := runner.CreateBasicRes(cfg, logruslog.Global, db)
+	basicRes := runner.CreateBasicRes(config.GetConfig(), logruslog.Global, db)
 
 	// Apply the migrations exactly the way the server does on startup.
 	migrator, migErr := migration.NewMigrator(basicRes)

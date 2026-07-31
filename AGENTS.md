@@ -180,13 +180,43 @@ Notes:
 - `backend/plugins/schema_e2e/` is **not** a plugin (no `main` package); it is
   excluded in `backend/scripts/build-plugins.sh`, otherwise `make build-plugin`
   fails with "-buildmode=plugin requires exactly one main package".
-- Both tests set a fallback `ENCRYPTION_SECRET` and call `dalgorm.Init(...)`;
+- Both tests run the migrations in a **dedicated, empty database**
+  (`<e2e-db>_<suffix>`) created by `e2ehelper.NewIsolatedMigrationDb` and dropped
+  again afterwards. The shared `E2E_DB_URL` database must not be used: the other
+  e2e tests `AutoMigrate` tables without writing to `_devlake_migration_history`,
+  so re-running the real scripts against it fails with e.g. `Table
+  'cicd_pipeline_commits' already exists`.
+- The helper sets a fallback `ENCRYPTION_SECRET` and calls `dalgorm.Init(...)`;
   without it migrations fail with `invalid encKey` / `invalid serializer type
   encdec` (`runner.CreateBasicRes` does not register the serializer, only
   `CreateAppBasicRes` does).
+- An **auto-increment primary key cannot be added to an existing table** via
+  `AutoMigrate` (MySQL: "there can be only one auto column and it must be
+  defined as a key"); use explicit dialect-specific DDL (`BIGINT UNSIGNED NOT
+  NULL AUTO_INCREMENT PRIMARY KEY` / `BIGSERIAL PRIMARY KEY`). Do **not** use
+  `migrationhelper.TransformTable` for this: it copies rows with a zero PK, so
+  all of them collapse into a single upserted row.
 - Migration scripts must not import `core/models/common` (enforced by
   `make migration-script-lint`) — use `core/models/migrationscripts/archived`.
 
+
+### CI im Fork (GitHub Actions)
+Die Workflows in `.github/workflows/` sind (bis auf Verbesserungen in `build.yml`)
+identisch mit `upstream/main`. Zwei Fork-spezifische Fallstricke:
+- Workflows mit `schedule:`-Trigger werden von GitHub in Forks automatisch
+  deaktiviert (`disabled_fork`) — betraf `unit-test` (`test.yml`). Mit
+  `gh workflow enable <id>` reaktivieren; `stale.yml` bleibt bewusst deaktiviert.
+- Die Upstream-Workflows triggern nur auf `push` nach `main` bzw.
+  `pull_request` mit Base `main`/`release-*`. Fork-Feature-Branches (`pr/**`)
+  und *stacked* PRs (Base ≠ `main`) bekommen dadurch keine CI.
+  Dafür existiert `.github/workflows/fork-ci.yml` (`branches-ignore: [main]`,
+  `workflow_dispatch`, `if: github.repository != 'apache/devlake'`), das
+  golangci-lint, migration-script-lint, unit-test, e2e (MySQL), config-ui,
+  ASF-Header- und Grafana-Check spiegelt.
+  **Wichtig:** `fork-ci.yml` gehört nur in den Fork-`main`. Upstream-PR-Branches
+  von `upstream/main` abzweigen — bei `pull_request`-Events nutzt GitHub die
+  Workflows des Merge-Refs, die Datei greift also trotzdem, ohne im Upstream-PR
+  als Diff aufzutauchen.
 
 ## Python Plugins
 Located in `backend/python/plugins/`. Use Poetry for dependencies. See [backend/python/README.md](backend/python/README.md).

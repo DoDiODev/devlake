@@ -21,13 +21,14 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/apache/incubator-devlake/core/config"
 	"github.com/apache/incubator-devlake/core/dal"
 	"github.com/apache/incubator-devlake/core/migration"
 	coreMigration "github.com/apache/incubator-devlake/core/models/migrationscripts"
-	"github.com/apache/incubator-devlake/core/plugin"
 	"github.com/apache/incubator-devlake/core/runner"
 	"github.com/apache/incubator-devlake/helpers/e2ehelper"
 	"github.com/apache/incubator-devlake/impls/dalgorm"
+	"github.com/apache/incubator-devlake/impls/logruslog"
 	"github.com/apache/incubator-devlake/plugins/jira/impl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -52,23 +53,20 @@ import (
 // the migrated table. Any future migration that forgets to embed
 // common.NoPKModel (or otherwise omits a column) will fail this test.
 //
+// The migrations run against a dedicated, empty database (see
+// e2ehelper.NewIsolatedMigrationDb) because the shared e2e database is polluted
+// by the other e2e tests, which AutoMigrate tables without recording anything
+// in `_devlake_migration_history`.
+//
 // Requires E2E_DB_URL (runs under `make e2e-test` / `make e2e-test-go-plugins`).
 func TestMigrationSchema(t *testing.T) {
 	var pluginInstance impl.Jira
-	dataflowTester := e2ehelper.NewDataFlowTester(t, "jira", pluginInstance)
 
-	// Some jira migration scripts refuse to run without an encryption secret
-	// (20220716: "jira v0.11 invalid encKey"); CI does not necessarily provide
-	// one, so fall back to a deterministic test value. dalgorm.Init registers
-	// the `encdec` GORM serializer used by connection models — without it the
-	// migrations fail with "invalid serializer type encdec".
-	if dataflowTester.Cfg.GetString(plugin.EncodeKeyEnvStr) == "" {
-		dataflowTester.Cfg.Set(plugin.EncodeKeyEnvStr, "jira-e2e-test-encryption-secret")
-	}
-	dalgorm.Init(dataflowTester.Cfg.GetString(plugin.EncodeKeyEnvStr))
+	db := e2ehelper.NewIsolatedMigrationDb(t, "jira_migration_schema")
+	dalInstance := dalgorm.NewDalgorm(db)
 
 	// Apply the real migration scripts so the schema matches a production install.
-	basicRes := runner.CreateBasicRes(dataflowTester.Cfg, dataflowTester.Log, dataflowTester.Db)
+	basicRes := runner.CreateBasicRes(config.GetConfig(), logruslog.Global, db)
 	migrator, err := migration.NewMigrator(basicRes)
 	require.NoError(t, err)
 	migrator.Register(coreMigration.All(), "Framework")
@@ -85,7 +83,7 @@ func TestMigrationSchema(t *testing.T) {
 			require.NoErrorf(t, err, "unable to parse schema for %T", table)
 
 			// Columns that actually exist in the migrated table.
-			actualColumns, err := dal.GetColumnNames(dataflowTester.Dal, table, keepAll)
+			actualColumns, err := dal.GetColumnNames(dalInstance, table, keepAll)
 			if err != nil || len(actualColumns) == 0 {
 				// No migration creates this table (e.g. API response models
 				// that are listed in GetTablesInfo but never persisted) —
