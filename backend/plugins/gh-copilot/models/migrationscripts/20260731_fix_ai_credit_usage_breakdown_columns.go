@@ -33,7 +33,6 @@ import (
 // that do not yet exist, so it is a no-op on databases that somehow already
 // have them.
 
-
 type enterpriseAiCreditUsageBreakdown20260731 struct {
 	GrossQuantity    float64 `gorm:"comment:Raw credits consumed"`
 	DiscountQuantity float64 `gorm:"comment:Credits discounted"`
@@ -97,4 +96,3 @@ func (u *fixAiCreditUsageBreakdownColumns) Version() uint64 {
 func (u *fixAiCreditUsageBreakdownColumns) Name() string {
 	return "add missing AI credit usage breakdown columns"
 }
-

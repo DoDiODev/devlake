@@ -92,7 +92,7 @@ class FakePlugin(Plugin):
     def domain_scopes(self, project: FakeProject):
         project_name = "_".join(project.name.lower().split(" "))
         yield CicdScope(
-            id=1,
+            id="1",
             name=project.name,
             url=f"http://fake.org/api/project/{project_name}"
         )
