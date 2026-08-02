@@ -16,7 +16,7 @@
 
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel
+from pydantic import BaseModel, ConfigDict, Field, RootModel, SerializeAsAny
 
 from pydevlake.model import ToolScope
 from pydevlake.migration import MigrationScript
@@ -86,7 +86,10 @@ class RemoteScopeGroup(RemoteScopeTreeNode):
 class RemoteScope(RemoteScopeTreeNode):
     type: Literal["scope"] = "scope"
     parent_id: str = Field(..., alias="parentId")
-    data: ToolScope
+    # SerializeAsAny keeps pydantic v2 from serializing this field by its
+    # declared base type (ToolScope) and dropping subclass-only fields such as
+    # the concrete scope's `url`; v1 always serialized the runtime type.
+    data: SerializeAsAny[ToolScope]
 
 
 class RemoteScopes(RootModel[list[RemoteScopeTreeNode]]):
