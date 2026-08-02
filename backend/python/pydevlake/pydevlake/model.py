@@ -101,10 +101,13 @@ class ScopeConfig(ToolTable, Model):
 
 class RawModel(SQLModel):
     id: int = Field(primary_key=True)
-    params: str = ''
-    data: str = ''
+    params: str = Field(default='', sa_type=Text())
+    # data holds raw API payloads and routinely exceeds the VARCHAR(255) that
+    # newer SQLModel/SQLAlchemy maps a bare `str` to on MySQL, which fails with
+    # "Data too long for column 'data'"; force TEXT like url/input.
+    data: str = Field(default='', sa_type=Text())
     url: str = Field(default='', sa_type=Text())
-    input: str = ''
+    input: str = Field(default='', sa_type=Text())
     created_at: datetime = Field(default_factory=datetime.now)
 
 

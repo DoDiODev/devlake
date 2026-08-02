@@ -68,7 +68,7 @@ class FakePipelineStream(Stream):
         fake_pipelines = []
         for i in range(250):
             fake_pipelines.append(FakePipeline(
-                id=i,
+                id=str(i),
                 state=states[i % len(states)],
                 started_at=datetime(2023, 1, 10, 11, 0, 0, microsecond=i),
                 finished_at=datetime(2023, 1, 10, 11, 3, 0, microsecond=i),
