@@ -12,8 +12,7 @@ require (
 	github.com/go-playground/validator/v10 v10.30.3
 	github.com/gocarina/gocsv v0.0.0-20260607070740-0735908c6461
 	github.com/google/uuid v1.6.0
-	github.com/jackc/pgx/v5 v5.10.0 // indirect
-	github.com/lib/pq v1.12.3
+	github.com/jackc/pgx/v5 v5.10.0
 	github.com/libgit2/git2go/v34 v34.0.0
 	github.com/magiconair/properties v1.8.10
 	github.com/mitchellh/mapstructure v1.5.0
