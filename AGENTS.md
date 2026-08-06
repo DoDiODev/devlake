@@ -217,6 +217,71 @@ identisch mit `upstream/main`. Zwei Fork-spezifische Fallstricke:
   von `upstream/main` abzweigen — bei `pull_request`-Events nutzt GitHub die
   Workflows des Merge-Refs, die Datei greift also trotzdem, ohne im Upstream-PR
   als Diff aufzutauchen.
+- **`action_required` bei Upstream-PRs ist normal, kein Fehler.** Workflows an
+  Fork-PRs gegen `apache/devlake` starten grundsätzlich in `action_required`; ein
+  Maintainer klickt „Approve and run workflows". Das passiert **routinemäßig** —
+  also **keinen** „please approve the workflows"-Kommentar posten (unnötiges
+  Rauschen für die Maintainer). Einfach abwarten.
+- **CI-Verifikation vor dem Öffnen eines Upstream-PRs:** Wegwerf-Branch
+  `ci/<welle>` = PR-Branch + `fork-ci.yml` (aus `versionUpgrade`, **nicht** aus
+  `main` — nur die `versionUpgrade`-Fassung baut das lake-builder-Image selbst),
+  pushen, Lauf grün ziehen, Branch danach verwerfen. Der Lauf wird im PR-Text als
+  CI-Nachweis verlinkt.
+- **`mericodev/lake-builder:latest` ist die CI-Toolchain aller Go-Jobs upstream**
+  (`test.yml`, `golangci-lint.yml`, `test-e2e.yml`, `migration-script-lint.yml`)
+  und **veraltet** (Stand 2026-08-03: libgit2 1.3.2, Go 1.20.4, mockery v2.20).
+  Jede Toolchain-Anhebung (libgit2/git2go, Go, mockery) macht die Apache-CI
+  zwangsläufig rot, bis ein Maintainer per `builder-*`-Tag
+  (`build-builder.yml`, Docker-Hub-Secrets) neu publiziert. Das gehört
+  **explizit in die PR-Beschreibung**, sonst wirkt der PR kaputt.
+
+## Fork-spezifische Dateikonventionen
+
+### `backend/Dockerfile` (Symlink) vs. `backend/Dockerfile.server` (Original)
+- `backend/Dockerfile.server` ist das **umbenannte, unveränderte** Upstream-
+  `backend/Dockerfile` (Multi-Stage-Build für die Produktions-/Server-Images).
+  Es wird normal getrackt und bei jedem Merge von `upstream/main` /
+  Dependency-Wellen (libgit2/git2go, Python-Version, mockery, swag, …)
+  aktualisiert — **das ist die Datei, gegen die PR-/Upstream-Branches
+  verglichen werden müssen**, nicht `backend/Dockerfile`.
+- `backend/Dockerfile` ist im Arbeitsverzeichnis ein **lokaler Symlink**
+  `backend/Dockerfile -> Dockerfile.local` (schnellere iterative Dev-Builds
+  mit BuildKit-Cache-Mounts, siehe `backend/Dockerfile.local`). Der Git-Index
+  trägt für diesen Pfad zusätzlich das **`skip-worktree`-Bit**
+  (`git ls-files -v backend/Dockerfile` → `S`), damit `git status`/`git diff`
+  den lokalen Symlink nicht dauerhaft als Änderung anzeigen. Der getrackte
+  Blob-Inhalt hinter dem Bit ist bewusst **eingefroren** (Alt-Stand, kein
+  Symlink) und wird **nicht** gepflegt.
+- **Gotcha bei `git merge`/`git rebase`:** Ein `skip-worktree`-Pfad blockiert
+  trotzdem Merges, sobald sich der getrackte Blob ändern müsste
+  (`Your local changes ... would be overwritten by merge`). Vorgehen:
+  ```bash
+  git update-index --no-skip-worktree backend/Dockerfile
+  git checkout -- backend/Dockerfile   # stellt den getrackten (alten) Inhalt her
+  # ... merge/rebase durchführen ...
+  ln -sf Dockerfile.local backend/Dockerfile
+  git update-index --skip-worktree backend/Dockerfile
+  ```
+  Konflikte in `backend/Dockerfile` selbst sind in aller Regel irrelevant
+  (Alt-Stand) — die eigentliche Änderung gehört nach `backend/Dockerfile.server`
+  nachgezogen, falls sie dort noch fehlt.
+
+### `scripts-local/` — eigenes, separates Git-Repo
+`scripts-local/` ist in der Top-Level-`.gitignore` ausgeschlossen und **kein**
+Teil dieses Repos (kein Submodule-Eintrag, keine `.gitmodules`). Das Verzeichnis
+enthält ein **eigenständiges, verschachteltes Git-Repository** mit eigener
+Remote (`devlake-local-scripts`, separater Server), eigener Historie und
+eigenem `main`-Branch. Konsequenzen für Agents:
+- Commits/Merges/Branch-Operationen im `devlake`-Repo (`git` ohne `-C
+  scripts-local`) berühren `scripts-local/` **nie** — Dateien dort tauchen in
+  `git status`/`git diff` des Devlake-Repos nicht auf.
+- Änderungen an `scripts-local/**` (Pläne, `STATUS.md`, …) müssen **separat**
+  in diesem verschachtelten Repo committet/gepusht werden
+  (`cd scripts-local && git add … && git commit … && git push`), nicht im
+  Devlake-Repo.
+- Bei rekursiven Suchen/Greps über den Workspace ist `scripts-local/` trotz
+  `.gitignore` sichtbar (Dateisystem), gehört aber nicht zur Apache-DevLake-
+  Codebasis — Lizenz-/Header-Checks, `make lint` etc. greifen dort nicht.
 
 ## Python Plugins
 Located in `backend/python/plugins/`. Use Poetry for dependencies. See [backend/python/README.md](backend/python/README.md).
@@ -225,6 +290,14 @@ Python is pinned to **3.11**. Note (verified 2026-07-28): Pydantic was migrated 
 unmaintained **`dbt-mysql` 1.7** adapter, which pins `dbt-core~=1.7.0`. That stack
 still runs on 3.13 but **breaks at runtime on 3.14**; dropping it (wave 4g) is the
 prerequisite for the Python 3.14 bump (wave 4f).
+
+## Agent-Tooling / Shell-Konventionen
+- **Kein HEREDOC** (`cat <<'EOF' ... EOF`) im Terminal-Tool: schlägt häufig fehl
+  (abgeschnittene/zerlegte Eingabe, Quoting-Probleme). Stattdessen den Inhalt in
+  eine **temporäre Datei** schreiben (Datei-Edit-Tool) und diese anschließend per
+  Kommando verwenden (`go run`, `psql -f`, `git commit -F`, `mv`, ...).
+- Temporäre Dateien immer unter **`/tmp/devlake-tmp-docs`** anlegen
+  (`mkdir -p /tmp/devlake-tmp-docs`), nicht im Repo — so bleibt der Working Tree sauber.
 
 ## Code Conventions
 - Tool model table names: `_tool_<plugin>_<entity>` (e.g., `_tool_gitlab_issues`)
