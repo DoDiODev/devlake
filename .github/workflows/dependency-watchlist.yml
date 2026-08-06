@@ -1,0 +1,158 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# Fork-only watchdog for the "extern gated" dependency majors tracked in
+# scripts-local/pr-descriptions/plan-wave4hGated.prompt.md (swag v1->v2,
+# TypeScript 6->7, Node 24->26 LTS). Dependabot itself cannot express "wait
+# until this external condition holds" - it only understands static
+# name/version-range/update-type matchers (see `ignore:` in the planned
+# `.github/dependabot.yml`, Wave 5). This workflow replaces the manual
+# "re-check with curl at every Pre-Wave-Gate" step with an automatic,
+# idempotent check that only opens/updates a tracking issue when a watched
+# item's unblock condition newly holds.
+#
+# Guarded so it never runs in apache/devlake should this file ever be merged
+# upstream (dependency-watchlist / wave-based planning is fork-only process,
+# not an upstream convention).
+#
+# NOTE: GitHub disables `schedule`-triggered workflows on forks after 60 days
+# of repo inactivity. Re-enable with `gh workflow enable dependency-watchlist`
+# if the scheduled run silently stops appearing. `workflow_dispatch` always
+# works regardless.
+name: dependency-watchlist
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # weekly, Monday 06:00 UTC - same cadence as dependabot
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  check-watchlist:
+    name: check gated majors (wave 4h)
+    if: github.repository != 'apache/devlake'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query external unblock conditions
+        id: check
+        run: |
+          python3 - <<'PYEOF' >> "$GITHUB_OUTPUT"
+          import json, re, urllib.request
+
+          def get(url):
+              req = urllib.request.Request(url, headers={"User-Agent": "devlake-dependency-watchlist"})
+              with urllib.request.urlopen(req, timeout=20) as r:
+                  return json.load(r)
+
+          findings = []
+
+          # 1. swag v1 -> v2: unblocked once the latest v2 tag is not a pre-release
+          try:
+              swag = get("https://proxy.golang.org/github.com/swaggo/swag/v2/@latest")
+              ver = swag.get("Version", "")
+              prerelease = bool(re.search(r'-(rc|beta|alpha)', ver, re.I))
+              findings.append(("swag-v2", ver, not prerelease,
+                  f"github.com/swaggo/swag/v2 latest = {ver}"))
+          except Exception as e:
+              findings.append(("swag-v2", "ERROR", False, str(e)))
+
+          # 2. Node 24 -> 26: unblocked once a v26 release has lts != false
+          try:
+              idx = get("https://nodejs.org/dist/index.json")
+              node26 = next((x for x in idx if x["version"].startswith("v26")), None)
+              lts_ok = bool(node26 and node26.get("lts"))
+              findings.append(("node-26-lts", node26["version"] if node26 else "n/a", lts_ok,
+                  f"node v26 entry: lts={node26.get('lts') if node26 else None}"))
+          except Exception as e:
+              findings.append(("node-26-lts", "ERROR", False, str(e)))
+
+          # 3. TypeScript 6 -> 7: flag (not a hard yes/no) once typescript-eslint's
+          #    declared peer range for `typescript` appears to include a 7.x major.
+          #    This is a heuristic - a real "yes" still requires `yarn build && yarn lint`
+          #    against typescript@7 locally before drawing conclusions.
+          try:
+              ts = get("https://registry.npmjs.org/typescript/latest")
+              ts_ver = ts.get("version", "")
+              tse = get("https://registry.npmjs.org/typescript-eslint/latest")
+              peer = (tse.get("peerDependencies") or {}).get("typescript", "")
+              likely_supported = bool(re.search(r'(<\s*8\b|\^7|>=\s*7)', peer))
+              findings.append(("typescript-7", ts_ver, likely_supported,
+                  f"typescript latest={ts_ver}, typescript-eslint peer.typescript=\"{peer}\""))
+          except Exception as e:
+              findings.append(("typescript-7", "ERROR", False, str(e)))
+
+          summary_lines = []
+          any_unblocked = False
+          for key, ver, unblocked, detail in findings:
+              status = "UNBLOCKED" if unblocked else "gated"
+              summary_lines.append(f"- `{key}`: **{status}** ({detail})")
+              if unblocked:
+                  any_unblocked = True
+
+          print("summary<<EOF")
+          print("\n".join(summary_lines))
+          print("EOF")
+          print(f"any_unblocked={'true' if any_unblocked else 'false'}")
+
+          # per-item outputs for the issue step
+          for key, ver, unblocked, detail in findings:
+              safe_key = key.replace('-', '_')
+              print(f"{safe_key}_unblocked={'true' if unblocked else 'false'}")
+              print(f"{safe_key}_detail={detail}")
+          PYEOF
+
+      - name: Print summary
+        run: |
+          echo "${{ steps.check.outputs.summary }}"
+          echo "${{ steps.check.outputs.summary }}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Ensure "dependencies" label exists
+        if: steps.check.outputs.any_unblocked == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # `gh issue create --label` fails hard if the label doesn't exist yet
+          # (only GitHub's default label set ships with a fresh fork) - create it
+          # idempotently instead of assuming it's there.
+          gh label create dependencies --color 0366d6 \
+            --description "Dependency / tooling version updates" --force
+
+      - name: Open/refresh tracking issue if something newly unblocked
+        if: steps.check.outputs.any_unblocked == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUMMARY: ${{ steps.check.outputs.summary }}
+        run: |
+          TITLE="[dependency-watchlist] wave 4h: mindestens ein Item unblocked"
+          EXISTING=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number --jq '.[0].number' || true)
+          BODY="Automatischer Re-Check (siehe \`scripts-local/pr-descriptions/plan-wave4hGated.prompt.md\`):
+
+          $SUMMARY
+
+          Nächster Schritt: Item aus der Watchlist herauslösen, eigenen refined Plan
+          + \`pr/wave4h-<topic>\`-Branch anlegen, STATUS.md §2 nachziehen. Ein
+          UNBLOCKED-Signal ist kein Freifahrtschein - vor dem Branch weiterhin
+          lokal validieren (z. B. \`yarn build && yarn lint\` gegen die neue
+          Major-Version)."
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+          else
+            gh issue create --title "$TITLE" --body "$BODY" --label dependencies
+          fi
+
