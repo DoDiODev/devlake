@@ -118,9 +118,11 @@ jobs:
           PYEOF
 
       - name: Print summary
+        env:
+          SUMMARY: ${{ steps.check.outputs.summary }}
         run: |
-          echo "${{ steps.check.outputs.summary }}"
-          echo "${{ steps.check.outputs.summary }}" >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' "$SUMMARY"
+          printf '%s\n' "$SUMMARY" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Ensure "dependencies" label exists
         if: steps.check.outputs.any_unblocked == 'true'
