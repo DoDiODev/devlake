@@ -136,6 +136,36 @@ make dev                                                     # Run server on :80
 cd config-ui && yarn && yarn start                          # UI on :4000
 ```
 
+### ⚠️ Die lokale Dev-DB ist Produktivdatenbestand — niemals `down -v`
+Die Compose-Projekte `devlake-mysql` / `devlake-postgresql` (Projektname steht als
+`name:` in den Compose-Dateien) halten in ihren **benannten Volumes**
+(`devlake-mysql_mysql-storage`, `…_grafana-storage`, `devlake-postgresql_postgres-storage`)
+den kompletten lokalen Konfigurationsbestand: Connections, Blueprints, Projects,
+Scope-Configs, gesammelte Daten, Grafana-Dashboard-State. Es gibt **kein**
+automatisches Backup und **keine** Wiederherstellung für gelöschte Docker-Volumes.
+
+Verbindliche Regeln für Agents:
+- **Nie** `docker compose -f docker-compose-dev-{mysql,postgresql}.yml down -v`,
+  `docker volume rm devlake-*`, `docker volume prune` oder `docker system prune --volumes`
+  ausführen. Auch nicht „nur zum Aufräumen" nach einem Test.
+- Für **Verifikationsläufe** (Image-Bumps, Grafana-/Provisioning-Checks, Smoke-Tests)
+  immer einen **eigenen Projektnamen** verwenden, dann ist `down -v` gefahrlos:
+  ```bash
+  docker compose -p devlake-verify -f docker-compose-dev-mysql.yml up -d mysql grafana
+  # ... prüfen ... (Ports können mit den Dev-Containern kollidieren -> Dev-Stack vorher stoppen, ohne -v)
+  docker compose -p devlake-verify -f docker-compose-dev-mysql.yml down -v
+  ```
+- Den Dev-Stack nur mit `down` / `stop` (**ohne** `-v`) herunterfahren.
+- Vor jedem Eingriff, der Volumes berühren könnte:
+  `scripts-local/backup-db.sh backup` (Dump nach `~/devlake-backups/`).
+  Zurückspielen mit `scripts-local/backup-db.sh restore <datei>`.
+  Das Skript läuft auch **während** einer Datenerfassung; es muss dafür
+  `_devlake_locking_stub` ausschließen (der laufende Server hält dort dauerhaft
+  eine offene Transaktion — ein `mysqldump` ohne `--ignore-table` bleibt in
+  „Waiting for table metadata lock" hängen und blockiert seinerseits die Pipeline).
+- Aussagen wie „es werden keine Daten verändert" gelten nur für den Git-Working-Tree.
+  Docker-Volumes sind davon **nicht** abgedeckt und müssen separat betrachtet werden.
+
 
 ## Testing
 
