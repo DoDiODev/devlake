@@ -48,4 +48,3 @@ func (*addMrCommitUpdatedAt) Version() uint64 {
 func (*addMrCommitUpdatedAt) Name() string {
 	return "gitlab: add commit_updated_at to merge requests"
 }
-
