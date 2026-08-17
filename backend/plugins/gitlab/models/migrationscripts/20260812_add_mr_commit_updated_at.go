@@ -15,22 +15,36 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package archived
+package migrationscripts
 
 import (
-	"github.com/apache/incubator-devlake/core/models/migrationscripts/archived"
+	"time"
+
+	"github.com/apache/incubator-devlake/core/context"
+	"github.com/apache/incubator-devlake/core/errors"
+	"github.com/apache/incubator-devlake/core/plugin"
 )
 
-type AzuredevopsConnection struct {
-	archived.Model
+var _ plugin.MigrationScript = (*addMrCommitUpdatedAt)(nil)
 
-	Name         string `gorm:"type:varchar(100);uniqueIndex" json:"name" validate:"required"`
-	Token        string `mapstructure:"token" validate:"required" encrypt:"yes"`
-	Proxy        string `gorm:"type:varchar(255)"`
-	Organization string `gorm:"type:varchar(255)"`
-	Endpoint     string `gorm:"type:varchar(255)"`
+type mrCommitUpdatedAt struct {
+	CommitUpdatedAt *time.Time
 }
 
-func (AzuredevopsConnection) TableName() string {
-	return "_tool_azuredevops_go_connections"
+func (mrCommitUpdatedAt) TableName() string {
+	return "_tool_gitlab_merge_requests"
+}
+
+type addMrCommitUpdatedAt struct{}
+
+func (*addMrCommitUpdatedAt) Up(basicRes context.BasicRes) errors.Error {
+	return errors.Convert(basicRes.GetDal().AutoMigrate(&mrCommitUpdatedAt{}))
+}
+
+func (*addMrCommitUpdatedAt) Version() uint64 {
+	return 20260812000001
+}
+
+func (*addMrCommitUpdatedAt) Name() string {
+	return "gitlab: add commit_updated_at to merge requests"
 }
