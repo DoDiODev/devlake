@@ -309,6 +309,14 @@ eigenem `main`-Branch. Konsequenzen für Agents:
   in diesem verschachtelten Repo committet/gepusht werden
   (`cd scripts-local && git add … && git commit … && git push`), nicht im
   Devlake-Repo.
+- **Versionsänderungen mit Auswirkung auf `scripts-local/setup.sh` müssen dort
+  immer synchron nachgezogen werden.** Bei Änderungen an Go, Node/Yarn, Python,
+  Poetry, mockery, libgit2/git2go oder anderen lokal installierten Build-Tools
+  sind Pins, Kompatibilitätsprüfungen, Installationslogik und zugehörige
+  Dokumentation in `setup.sh` abzugleichen, geeignet zu validieren (mindestens
+  `bash -n scripts-local/setup.sh` plus ein zielversionsspezifischer Check) und
+  gemäß der vorstehenden Regel separat im `scripts-local`-Repo zu committen und
+  zu pushen.
 - Bei rekursiven Suchen/Greps über den Workspace ist `scripts-local/` trotz
   `.gitignore` sichtbar (Dateisystem), gehört aber nicht zur Apache-DevLake-
   Codebasis — Lizenz-/Header-Checks, `make lint` etc. greifen dort nicht.
