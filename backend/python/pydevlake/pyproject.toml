@@ -30,15 +30,15 @@ inflect = "^7.5"
 fire = "^0.7"
 pydantic = "^2.13"
 pydevd-pycharm = "^231.6471.3"
-pytest = "^9.1"
+pytest = "^9.1.1"
 jsonref = "^1.1.0"
 psycopg2 = "^2.9.5"
 jsonpointer = "^3.1"
-certifi = "^2023.7.22"
+certifi = "^2026.7.22"
 
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^9.1"
+pytest = "^9.1.1"
 
 [build-system]
 requires = ["poetry-core"]
