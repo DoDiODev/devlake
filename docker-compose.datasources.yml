@@ -46,11 +46,11 @@ services:
 
   # see https://developer.atlassian.com/platform/marketplace/timebomb-licenses-for-testing-server-apps/ for temporary test licenses
   jira:
-    image: atlassian/jira-software:9.5.0
+    image: atlassian/jira-software:10.4.0
     volumes:
       - ./.docker/jira:/var/atlassian/jira
-      #download this jar from https://dev.mysql.com/downloads/connector/j/8.0.html if needed
-      - ./.docker/mysql-connector-j-8.0.32.jar:/opt/atlassian/jira/lib/mysql-connector-j-8.0.32.jar
+      # download this jar from https://dev.mysql.com/downloads/connector/j/8.4.html if needed
+      - ./.docker/mysql-connector-j-8.4.0.jar:/opt/atlassian/jira/lib/mysql-connector-j-8.4.0.jar
     ports:
       - '8090:8080' # the UI
     environment:
