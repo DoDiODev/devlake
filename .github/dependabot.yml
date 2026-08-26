@@ -1,0 +1,241 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# Dependabot version updates.
+#
+# Conventions used throughout this file:
+#   * `commit-message.prefix: build(deps)` matches the commit convention that
+#     `.github/workflows/commit-msg.yml` enforces on every pull request.
+#   * Minor and patch updates are grouped into a single pull request per
+#     ecosystem; majors stay separate so they remain individually reviewable.
+#   * `ignore` entries document deliberately deferred upgrades. Each one names
+#     the reason, so the rule can be removed once the reason disappears.
+#
+# Known coverage gaps (intentionally not automated):
+#   * `docker-compose*.yml` is not read by the `docker` ecosystem, which only
+#     parses Dockerfiles. The `mysql`/`postgres` service images therefore stay
+#     on manual maintenance.
+#   * `devops/deployment/k8s/k8s-deploy.yaml` and the Helm chart pin images in
+#     plain YAML and are likewise out of scope.
+#   * `backend/scripts/install-mockery.sh` pins a tool version in a shell
+#     script and is not a supported manifest format.
+version: 2
+updates:
+  # ---------------------------------------------------------------- Go -----
+  - package-ecosystem: gomod
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build(deps)
+    labels:
+      - dependencies
+      - go
+    groups:
+      go-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # The Go toolchain directive is coupled to the CI bootstrap version and
+      # to the golang base images; it is raised deliberately, never by a bot.
+      - dependency-name: go
+      # git2go is ABI-coupled to the libgit2 version installed in the builder
+      # image. A mismatch fails at link time, so this is always manual.
+      - dependency-name: github.com/libgit2/git2go/*
+      # swag v2 is still a release candidate and requires regenerating every
+      # swagger annotation. Tracked as an externally gated upgrade.
+      - dependency-name: github.com/swaggo/swag
+        update-types:
+          - version-update:semver-major
+
+  # -------------------------------------------------------------- npm ------
+  - package-ecosystem: npm
+    directory: /config-ui
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build(deps)
+    labels:
+      - dependencies
+      - frontend
+    groups:
+      js-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # TypeScript 7 is the native-port compiler. Upgrading requires validating
+      # the whole build chain (vite, eslint, type definitions) in one go.
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: npm
+    directory: /e2e
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build(deps)
+    labels:
+      - dependencies
+      - frontend
+    # This directory has no lockfile. Without `increase`, Dependabot would stay
+    # silent as long as a new release still satisfies the declared caret range.
+    versioning-strategy: increase
+    groups:
+      e2e-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  # ------------------------------------------------------------- Python ----
+  - package-ecosystem: pip
+    directories:
+      - /backend/python
+      - /backend/python/pydevlake
+      - /backend/python/plugins/azuredevops
+      - /backend/python/test/fakeplugin
+      - /grafana/scripts
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build(deps)
+    labels:
+      - dependencies
+      - python
+    groups:
+      python-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # The dbt adapters are unpinned in backend/python/requirements.txt and
+      # the plugin is scheduled for removal, so bumping them adds no value.
+      - dependency-name: dbt-*
+
+  # ------------------------------------------------------------- Docker ----
+  #
+  # Note on Docker tag semantics: language base images encode their language
+  # version in the tag, so `python:3.11 -> python:3.14` and
+  # `golang:1.26 -> golang:1.27` are classified as *minor* updates. Both are
+  # runtime-defining decisions rather than dependency bumps, which is why they
+  # are ignored for minor as well as major below.
+  - package-ecosystem: docker
+    directories:
+      - /backend
+      - /config-ui
+      - /grafana
+      - /devops/docker/lake-builder
+      - /devops/docker/alpine-dbt
+      - /.devcontainer
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build(deps)
+    labels:
+      - dependencies
+      - docker
+    groups:
+      docker-patch:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+    ignore:
+      # The Python runtime is pinned to the version the plugin framework and
+      # its Poetry locks are resolved against; it moves with those, not alone.
+      - dependency-name: python
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
+      # The Go builder image must stay in step with the toolchain directive in
+      # backend/go.mod and the CI bootstrap version.
+      - dependency-name: golang
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
+      - dependency-name: mcr.microsoft.com/devcontainers/go
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
+      # Node 26 is not a long-term-support release; the build image tracks the
+      # active LTS line only.
+      - dependency-name: node
+        update-types:
+          - version-update:semver-major
+      # alpine-dbt belongs to the dbt plugin that is scheduled for removal.
+      - dependency-name: alpine
+
+  # ------------------------------------------------------ GitHub Actions ---
+  #
+  # Most workflows reference actions by tag, while the docker/* actions are
+  # pinned to a commit SHA with a `# vX.Y.Z` comment. Dependabot updates a
+  # SHA pin to the new SHA and rewrites that comment, so pinning is preserved.
+  #
+  # Dependabot never proposes a change of action *namespace*. Migrating to a
+  # differently owned action stays a manual step because ASF infrastructure
+  # maintains an allow-list of permitted actions.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build(deps)
+    labels:
+      - dependencies
+      - ci
+    groups:
+      actions-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
