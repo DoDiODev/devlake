@@ -154,11 +154,13 @@ updates:
 
   # ------------------------------------------------------------- Docker ----
   #
-  # Note on Docker tag semantics: language base images encode their language
-  # version in the tag, so `python:3.11 -> python:3.14` and
-  # `golang:1.26 -> golang:1.27` are classified as *minor* updates. Both are
-  # runtime-defining decisions rather than dependency bumps, which is why they
-  # are ignored for minor as well as major below.
+  # Note on Docker tag semantics: language base images encode their version in
+  # the tag, so `node:24 -> node:25` is a major update while
+  # `python:3.11 -> python:3.14` would count as a minor one. All three images
+  # define a runtime rather than a dependency: the Python tag has to match what
+  # the Poetry lockfiles resolve against, and the Go tag has to match the `go`
+  # directive in backend/go.mod and the toolchain used by CI. They are raised
+  # deliberately, so they are ignored here.
   - package-ecosystem: docker
     directories:
       - /backend
@@ -185,14 +187,18 @@ updates:
         update-types:
           - patch
     ignore:
-      # The Python runtime is pinned to the version the plugin framework and
-      # its Poetry locks are resolved against; it moves with those, not alone.
+      # The build image tracks the active LTS line. Node 26 is not an LTS
+      # release, and a trial run confirmed that without this rule Dependabot
+      # proposes moving from 24 to 25.
+      - dependency-name: node
+        update-types:
+          - version-update:semver-major
+      # Ignored for minor as well, because a jump such as 3.11 -> 3.14 is a
+      # minor update in tag terms while being a runtime change in practice.
       - dependency-name: python
         update-types:
           - version-update:semver-major
           - version-update:semver-minor
-      # The Go builder image must stay in step with the toolchain directive in
-      # backend/go.mod and the CI bootstrap version.
       - dependency-name: golang
         update-types:
           - version-update:semver-major
@@ -201,11 +207,6 @@ updates:
         update-types:
           - version-update:semver-major
           - version-update:semver-minor
-      # Node 26 is not a long-term-support release; the build image tracks the
-      # active LTS line only.
-      - dependency-name: node
-        update-types:
-          - version-update:semver-major
       # alpine-dbt belongs to the dbt plugin that is scheduled for removal.
       - dependency-name: alpine
 
