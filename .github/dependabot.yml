@@ -147,10 +147,6 @@ updates:
         update-types:
           - minor
           - patch
-    ignore:
-      # The dbt adapters are unpinned in backend/python/requirements.txt and
-      # the plugin is scheduled for removal, so bumping them adds no value.
-      - dependency-name: dbt-*
 
   # ------------------------------------------------------------- Docker ----
   #
@@ -167,7 +163,6 @@ updates:
       - /config-ui
       - /grafana
       - /devops/docker/lake-builder
-      - /devops/docker/alpine-dbt
       - /.devcontainer
     schedule:
       interval: weekly
@@ -207,8 +202,6 @@ updates:
         update-types:
           - version-update:semver-major
           - version-update:semver-minor
-      # alpine-dbt belongs to the dbt plugin that is scheduled for removal.
-      - dependency-name: alpine
 
   # ------------------------------------------------------ GitHub Actions ---
   #
