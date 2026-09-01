@@ -51,6 +51,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - run: git config --global --add safe.directory $(pwd)
+      # The lake-builder image still ships Go 1.20 and mockery v2. Upstream
+      # installs the pinned versions at runtime; mirror that here, otherwise
+      # `make mock` fails on the v3 config with "invalid keys: pkgname, ...".
+      - name: Install libgit2 1.5 for git2go v34
+        run: backend/scripts/install-libgit2.sh
+      - name: Install Go 1.26.6
+        run: backend/scripts/install-go.sh
+      - name: Install mockery 3.7.4
+        run: backend/scripts/install-mockery.sh
       - name: generate mock
         run: |
           go version
@@ -84,6 +93,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - run: git config --global --add safe.directory $(pwd)
+      - name: Install libgit2 1.5 for git2go v34
+        run: backend/scripts/install-libgit2.sh
+      - name: Install Go 1.26.6
+        run: backend/scripts/install-go.sh
+      - name: Install mockery 3.7.4
+        run: backend/scripts/install-mockery.sh
       - name: Build Python
         run: |
           cd backend
@@ -120,6 +135,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - run: git config --global --add safe.directory $(pwd)
+      - name: Install libgit2 1.5 for git2go v34
+        run: backend/scripts/install-libgit2.sh
+      - name: Install Go 1.26.6
+        run: backend/scripts/install-go.sh
+      - name: Install mockery 3.7.4
+        run: backend/scripts/install-mockery.sh
       - name: Build Python
         run: |
           cd backend
