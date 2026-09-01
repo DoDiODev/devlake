@@ -31,6 +31,7 @@ Apache DevLake is a dev data platform that ingests data from DevOps tools (GitHu
 - **backend/python/**: Python plugin framework via RPC
 - **config-ui/**: React frontend (TypeScript, Vite, Ant Design)
 - **grafana/**: Dashboard definitions
+- **e2e/**: Top-level Playwright end-to-end tests (`qdev-full-flow.spec.ts`, `render-smoke.spec.ts`)
 
 ## Plugin Development (Go)
 
@@ -52,6 +53,25 @@ See [backend/plugins/gitlab/impl/impl.go](backend/plugins/gitlab/impl/impl.go) f
 - `PluginMigration`: MigrationScripts() for DB schema evolution
 - `PluginSource`: Connection(), Scope(), ScopeConfig()
 
+### Advanced Plugin Interfaces
+- `PluginInit`: Optional initialization hook with `Init(basicRes)` method for resource setup
+- `PluginOpenApiSpec`: Remote plugins can expose OpenAPI specs via `OpenApiSpec()` method
+- `PluginMetric`: For metrics plugins requiring `RequiredDataEntities()`, `IsProjectMetric()`, `RunAfter()`, `Settings()`
+- `DataSourcePluginBlueprintV200`: Project-aware pipeline generation with `MakeDataSourcePipelinePlanV200()` for cross-plugin scope mapping
+- `MetricPluginBlueprintV200`: Similar to DataSourcePluginBlueprintV200 for metric calculation plugins
+
+### Authentication Patterns
+Plugins can support multiple authentication methods via these interfaces:
+- `CacheableConnection`: Extends `ApiConnection` with `GetHash()` for connection caching
+- `MultiAuthenticator`: Base interface with `GetAuthMethod()` returning `BasicAuth`, `AccessToken`, or `AppKey`
+- `BasicAuthenticator`: Implement `GetBasicAuthenticator()` for HTTP Basic auth
+- `AccessTokenAuthenticator`: Implement `GetAccessTokenAuthenticator()` for Bearer token auth
+- `AppKeyAuthenticator`: Implement `GetAppKeyAuthenticator()` for API key/secret pairs
+- `PrepareApiClient`: Hook in connection for initialization (e.g., token refresh) via `PrepareApiClient(apiClient)`
+
+### Dynamic Models
+- `DynamicTabler` interface: For runtime-generated models with methods `Unwrap()`, `NewValue()`, `From()`, `To()`
+
 ### Subtask Pattern (Collector → Extractor → Converter)
 ```go
 // 1. Register subtask in tasks/register.go via init()
@@ -70,6 +90,17 @@ var CollectIssuesMeta = plugin.SubTaskMeta{
 - Use `helper.NewStatefulApiCollector` for incremental collection with time-based bookmarking
 - See [backend/plugins/gitlab/tasks/issue_collector.go](backend/plugins/gitlab/tasks/issue_collector.go)
 
+### Custom Plugin: q_dev (AWS Q Developer)
+[backend/plugins/q_dev/](backend/plugins/q_dev/) is an upstream plugin (present and
+identical in `apache/devlake` `main`; verified 2026-07-21 — **not** a fork-only
+artifact) that collects Amazon Q Developer
+usage metrics from **AWS S3** (not a REST API). Scoping is S3 prefix-based (`QDevS3Slice`/`QDevS3FileMeta`
+with year/month partitioning) rather than domain-layer scopes. Models: `QDevConnection`, `QDevUserData`,
+`QDevUserReport`, `QDevChatLog`, `QDevCompletionLog`. It implements `PluginInit` and
+`DataSourcePluginBlueprintV200`. A LocalStack S3 mock can be used for local/E2E runs.
+It still uses `aws-sdk-go` v1 (migration to aws-sdk-go-v2 tracked as a regular
+upstream change, not fork-only).
+
 ### Migration Scripts
 - Located in `models/migrationscripts/`
 - Register all scripts in `register.go`'s `All()` function
@@ -82,29 +113,71 @@ var CollectIssuesMeta = plugin.SubTaskMeta{
 make dep              # Install Go + Python dependencies
 make build            # Build plugins + server
 make dev              # Build + run server
-make godev            # Go-only dev (no Python plugins)
+make godev            # Go-only dev (no Python remote plugins)
 make unit-test        # Run all unit tests
 make e2e-test         # Run E2E tests
 
 # From backend/
 make swag             # Regenerate Swagger docs (required after API changes)
 make lint             # Run golangci-lint
+make mock             # Regenerate mocks from interfaces
+make migration-script-lint  # Validate migration script format
+make build-plugin-debug     # Build plugins with debug symbols (DEVLAKE_DEBUG=1)
+make build-pydevlake        # Install/sync Python plugin framework dependencies
+make e2e-test-go-plugins    # Run E2E tests for Go plugins only
 ```
 
 ### Running Locally
 ```bash
-docker-compose -f docker-compose-dev.yml up mysql grafana  # Start deps
+# MySQL stack (docker-compose-dev.yml does NOT exist - use the DB-specific files)
+docker-compose -f docker-compose-dev-mysql.yml up mysql grafana       # MySQL + Grafana
+docker-compose -f docker-compose-dev-postgresql.yml up postgres grafana  # or PostgreSQL + Grafana
 make dev                                                     # Run server on :8080
 cd config-ui && yarn && yarn start                          # UI on :4000
 ```
 
+### ⚠️ Die lokale Dev-DB ist Produktivdatenbestand — niemals `down -v`
+Die Compose-Projekte `devlake-mysql` / `devlake-postgresql` (Projektname steht als
+`name:` in den Compose-Dateien) halten in ihren **benannten Volumes**
+(`devlake-mysql_mysql-storage`, `…_grafana-storage`, `devlake-postgresql_postgres-storage`)
+den kompletten lokalen Konfigurationsbestand: Connections, Blueprints, Projects,
+Scope-Configs, gesammelte Daten, Grafana-Dashboard-State. Es gibt **kein**
+automatisches Backup und **keine** Wiederherstellung für gelöschte Docker-Volumes.
+
+Verbindliche Regeln für Agents:
+- **Nie** `docker compose -f docker-compose-dev-{mysql,postgresql}.yml down -v`,
+  `docker volume rm devlake-*`, `docker volume prune` oder `docker system prune --volumes`
+  ausführen. Auch nicht „nur zum Aufräumen" nach einem Test.
+- Für **Verifikationsläufe** (Image-Bumps, Grafana-/Provisioning-Checks, Smoke-Tests)
+  immer einen **eigenen Projektnamen** verwenden, dann ist `down -v` gefahrlos:
+  ```bash
+  docker compose -p devlake-verify -f docker-compose-dev-mysql.yml up -d mysql grafana
+  # ... prüfen ... (Ports können mit den Dev-Containern kollidieren -> Dev-Stack vorher stoppen, ohne -v)
+  docker compose -p devlake-verify -f docker-compose-dev-mysql.yml down -v
+  ```
+- Den Dev-Stack nur mit `down` / `stop` (**ohne** `-v`) herunterfahren.
+- Vor jedem Eingriff, der Volumes berühren könnte:
+  `scripts-local/backup-db.sh backup` (Dump nach `~/devlake-backups/`).
+  Zurückspielen mit `scripts-local/backup-db.sh restore <datei>`.
+  Das Skript läuft auch **während** einer Datenerfassung; es muss dafür
+  `_devlake_locking_stub` ausschließen (der laufende Server hält dort dauerhaft
+  eine offene Transaktion — ein `mysqldump` ohne `--ignore-table` bleibt in
+  „Waiting for table metadata lock" hängen und blockiert seinerseits die Pipeline).
+- Aussagen wie „es werden keine Daten verändert" gelten nur für den Git-Working-Tree.
+  Docker-Volumes sind davon **nicht** abgedeckt und müssen separat betrachtet werden.
+
+
 ## Testing
 
 ### Unit Tests
-Place `*_test.go` files alongside source. Use mocks from `backend/mocks/`.
+Place `*_test.go` files alongside source. Use mocks from `backend/mocks/`. Mocks are auto-generated via `make mock` from all interfaces in `core/` and `helpers/`.
 
 ### E2E Tests for Plugins
 Use CSV fixtures in `e2e/` directory. See [backend/test/helper/](backend/test/helper/) for the Go test client that can spin up an in-memory DevLake instance.
+
+### Playwright E2E (full flow)
+The top-level [e2e/](e2e/) directory holds Playwright browser tests against a running stack. Open the
+report with `cd e2e && npx playwright show-report`.
 
 ### Integration Testing
 ```go
@@ -116,17 +189,174 @@ helper.ConnectLocalServer(t, &helper.LocalClientConfig{
 })
 ```
 
+### Model Validation
+Run `make migration-script-lint` from `backend/` to validate all migration scripts follow the correct format (`YYYYMMDD_description.go`).
+
+### Schema-Drift Guard (migration vs. model)
+Two e2e checks assert that the schema produced by the **real migration scripts**
+still matches what the **runtime GORM models** expect (they run the migrations
+instead of `AutoMigrate`-ing the model, which would hide drift):
+- `backend/plugins/jira/e2e/migration_schema_test.go` — Jira-specific regression
+  test for the Sprint Report `_raw_data_table` bug.
+- `backend/plugins/schema_e2e/migration_schema_test.go` — cross-plugin guard for
+  **every** built-in Go plugin, plus `TestAllGoPluginsListed`, which fails if a
+  new plugin's `impl` package is not registered in `allGoPlugins()`.
+
+Both require `E2E_DB_URL` and run under `make e2e-test-go-plugins`. A common
+cause of failure: a migration struct that forgets to embed `common.NoPKModel`,
+so the `_raw_data_*` columns are missing while the model declares them.
+
+Notes:
+- `backend/plugins/schema_e2e/` is **not** a plugin (no `main` package); it is
+  excluded in `backend/scripts/build-plugins.sh`, otherwise `make build-plugin`
+  fails with "-buildmode=plugin requires exactly one main package".
+- Both tests run the migrations in a **dedicated, empty database**
+  (`<e2e-db>_<suffix>`) created by `e2ehelper.NewIsolatedMigrationDb` and dropped
+  again afterwards. The shared `E2E_DB_URL` database must not be used: the other
+  e2e tests `AutoMigrate` tables without writing to `_devlake_migration_history`,
+  so re-running the real scripts against it fails with e.g. `Table
+  'cicd_pipeline_commits' already exists`.
+- The helper sets a fallback `ENCRYPTION_SECRET` and calls `dalgorm.Init(...)`;
+  without it migrations fail with `invalid encKey` / `invalid serializer type
+  encdec` (`runner.CreateBasicRes` does not register the serializer, only
+  `CreateAppBasicRes` does).
+- An **auto-increment primary key cannot be added to an existing table** via
+  `AutoMigrate` (MySQL: "there can be only one auto column and it must be
+  defined as a key"); use explicit dialect-specific DDL (`BIGINT UNSIGNED NOT
+  NULL AUTO_INCREMENT PRIMARY KEY` / `BIGSERIAL PRIMARY KEY`). Do **not** use
+  `migrationhelper.TransformTable` for this: it copies rows with a zero PK, so
+  all of them collapse into a single upserted row.
+- Migration scripts must not import `core/models/common` (enforced by
+  `make migration-script-lint`) — use `core/models/migrationscripts/archived`.
+
+
+### CI im Fork (GitHub Actions)
+Die Workflows in `.github/workflows/` sind (bis auf Verbesserungen in `build.yml`)
+identisch mit `upstream/main`. Zwei Fork-spezifische Fallstricke:
+- Workflows mit `schedule:`-Trigger werden von GitHub in Forks automatisch
+  deaktiviert (`disabled_fork`) — betraf `unit-test` (`test.yml`). Mit
+  `gh workflow enable <id>` reaktivieren; `stale.yml` bleibt bewusst deaktiviert.
+- Die Upstream-Workflows triggern nur auf `push` nach `main` bzw.
+  `pull_request` mit Base `main`/`release-*`. Fork-Feature-Branches (`pr/**`)
+  und *stacked* PRs (Base ≠ `main`) bekommen dadurch keine CI.
+  Dafür existiert `.github/workflows/fork-ci.yml` (`branches-ignore: [main]`,
+  `workflow_dispatch`, `if: github.repository != 'apache/devlake'`), das
+  golangci-lint, migration-script-lint, unit-test, e2e (MySQL), config-ui,
+  ASF-Header- und Grafana-Check spiegelt.
+  **Wichtig:** `fork-ci.yml` gehört nur in den Fork-`main`. Upstream-PR-Branches
+  von `upstream/main` abzweigen — bei `pull_request`-Events nutzt GitHub die
+  Workflows des Merge-Refs, die Datei greift also trotzdem, ohne im Upstream-PR
+  als Diff aufzutauchen.
+- **`action_required` bei Upstream-PRs ist normal, kein Fehler.** Workflows an
+  Fork-PRs gegen `apache/devlake` starten grundsätzlich in `action_required`; ein
+  Maintainer klickt „Approve and run workflows". Das passiert **routinemäßig** —
+  also **keinen** „please approve the workflows"-Kommentar posten (unnötiges
+  Rauschen für die Maintainer). Einfach abwarten.
+- **CI-Verifikation vor dem Öffnen eines Upstream-PRs:** Wegwerf-Branch
+  `ci/<welle>` = PR-Branch + `fork-ci.yml` (aus `local/base`, **nicht** aus
+  `main` — nur die `local/base`-Fassung baut das lake-builder-Image selbst),
+  pushen, Lauf grün ziehen, Branch danach verwerfen. Der Lauf wird im PR-Text als
+  CI-Nachweis verlinkt.
+- **`local/base` ist die lokale Integrationsbasis** (seit 2026-09-01, ersetzt
+  `versionUpgrade`): `upstream/main` + fork-only CI + lokale Dev-Ergonomie,
+  **ohne** eigene `go.mod`/`go.sum`. Diese beiden Dateien bleiben byte-identisch
+  zu upstream, damit der wöchentliche Dependabot-Lauf keine Dauerkonflikte
+  erzeugt. Neue Wellen zweigen von `upstream/main` ab, nicht von `local/base`.
+- **`mericodev/lake-builder:latest` ist die CI-Toolchain aller Go-Jobs upstream**
+  (`test.yml`, `golangci-lint.yml`, `test-e2e.yml`, `migration-script-lint.yml`)
+  und **veraltet** (Stand 2026-08-03: libgit2 1.3.2, Go 1.20.4, mockery v2.20).
+  Jede Toolchain-Anhebung (libgit2/git2go, Go, mockery) macht die Apache-CI
+  zwangsläufig rot, bis ein Maintainer per `builder-*`-Tag
+  (`build-builder.yml`, Docker-Hub-Secrets) neu publiziert. Das gehört
+  **explizit in die PR-Beschreibung**, sonst wirkt der PR kaputt.
+
+## Fork-spezifische Dateikonventionen
+
+### `backend/Dockerfile` (Symlink) vs. `backend/Dockerfile.server` (Original)
+- `backend/Dockerfile.server` ist das **umbenannte, unveränderte** Upstream-
+  `backend/Dockerfile` (Multi-Stage-Build für die Produktions-/Server-Images).
+  Es wird normal getrackt und bei jedem Merge von `upstream/main` /
+  Dependency-Wellen (libgit2/git2go, Python-Version, mockery, swag, …)
+  aktualisiert — **das ist die Datei, gegen die PR-/Upstream-Branches
+  verglichen werden müssen**, nicht `backend/Dockerfile`.
+- `backend/Dockerfile` ist im Arbeitsverzeichnis ein **lokaler Symlink**
+  `backend/Dockerfile -> Dockerfile.local` (schnellere iterative Dev-Builds
+  mit BuildKit-Cache-Mounts, siehe `backend/Dockerfile.local`). Der Git-Index
+  trägt für diesen Pfad zusätzlich das **`skip-worktree`-Bit**
+  (`git ls-files -v backend/Dockerfile` → `S`), damit `git status`/`git diff`
+  den lokalen Symlink nicht dauerhaft als Änderung anzeigen. Der getrackte
+  Blob-Inhalt hinter dem Bit ist bewusst **eingefroren** (Alt-Stand, kein
+  Symlink) und wird **nicht** gepflegt.
+- **Gotcha bei `git merge`/`git rebase`:** Ein `skip-worktree`-Pfad blockiert
+  trotzdem Merges, sobald sich der getrackte Blob ändern müsste
+  (`Your local changes ... would be overwritten by merge`). Vorgehen:
+  ```bash
+  git update-index --no-skip-worktree backend/Dockerfile
+  git checkout -- backend/Dockerfile   # stellt den getrackten (alten) Inhalt her
+  # ... merge/rebase durchführen ...
+  ln -sf Dockerfile.local backend/Dockerfile
+  git update-index --skip-worktree backend/Dockerfile
+  ```
+  Konflikte in `backend/Dockerfile` selbst sind in aller Regel irrelevant
+  (Alt-Stand) — die eigentliche Änderung gehört nach `backend/Dockerfile.server`
+  nachgezogen, falls sie dort noch fehlt.
+
+### `scripts-local/` — eigenes, separates Git-Repo
+`scripts-local/` ist in der Top-Level-`.gitignore` ausgeschlossen und **kein**
+Teil dieses Repos (kein Submodule-Eintrag, keine `.gitmodules`). Das Verzeichnis
+enthält ein **eigenständiges, verschachteltes Git-Repository** mit eigener
+Remote (`devlake-local-scripts`, separater Server), eigener Historie und
+eigenem `main`-Branch. Konsequenzen für Agents:
+- Commits/Merges/Branch-Operationen im `devlake`-Repo (`git` ohne `-C
+  scripts-local`) berühren `scripts-local/` **nie** — Dateien dort tauchen in
+  `git status`/`git diff` des Devlake-Repos nicht auf.
+- Änderungen an `scripts-local/**` (Pläne, `STATUS.md`, …) müssen **separat**
+  in diesem verschachtelten Repo committet/gepusht werden
+  (`cd scripts-local && git add … && git commit … && git push`), nicht im
+  Devlake-Repo.
+- **Versionsänderungen mit Auswirkung auf `scripts-local/setup.sh` müssen dort
+  immer synchron nachgezogen werden.** Bei Änderungen an Go, Node/Yarn, Python,
+  Poetry, mockery, libgit2/git2go oder anderen lokal installierten Build-Tools
+  sind Pins, Kompatibilitätsprüfungen, Installationslogik und zugehörige
+  Dokumentation in `setup.sh` abzugleichen, geeignet zu validieren (mindestens
+  `bash -n scripts-local/setup.sh` plus ein zielversionsspezifischer Check) und
+  gemäß der vorstehenden Regel separat im `scripts-local`-Repo zu committen und
+  zu pushen.
+- Bei rekursiven Suchen/Greps über den Workspace ist `scripts-local/` trotz
+  `.gitignore` sichtbar (Dateisystem), gehört aber nicht zur Apache-DevLake-
+  Codebasis — Lizenz-/Header-Checks, `make lint` etc. greifen dort nicht.
+
 ## Python Plugins
 Located in `backend/python/plugins/`. Use Poetry for dependencies. See [backend/python/README.md](backend/python/README.md).
+Python is pinned to **3.11**. Note (verified 2026-07-28): Pydantic was migrated to
+**v2** (wave 3b.2), so the remaining blocker for a newer runtime is the
+unmaintained **`dbt-mysql` 1.7** adapter, which pins `dbt-core~=1.7.0`. That stack
+still runs on 3.13 but **breaks at runtime on 3.14**; dropping it (wave 4g) is the
+prerequisite for the Python 3.14 bump (wave 4f).
+
+## Agent-Tooling / Shell-Konventionen
+- **Kein HEREDOC** (`cat <<'EOF' ... EOF`) im Terminal-Tool: schlägt häufig fehl
+  (abgeschnittene/zerlegte Eingabe, Quoting-Probleme). Stattdessen den Inhalt in
+  eine **temporäre Datei** schreiben (Datei-Edit-Tool) und diese anschließend per
+  Kommando verwenden (`go run`, `psql -f`, `git commit -F`, `mv`, ...).
+- Temporäre Dateien immer unter **`/tmp/devlake-tmp-docs`** anlegen
+  (`mkdir -p /tmp/devlake-tmp-docs`), nicht im Repo — so bleibt der Working Tree sauber.
 
 ## Code Conventions
 - Tool model table names: `_tool_<plugin>_<entity>` (e.g., `_tool_gitlab_issues`)
 - Domain model IDs: Use `didgen.NewDomainIdGenerator` for consistent cross-plugin IDs
 - All plugins must be independent - no cross-plugin imports
 - Apache 2.0 license header required on all source files
+- Mocks are auto-generated: don't edit files in `backend/mocks/`, regenerate with `make mock`
+- Optional plugin interfaces (PluginInit, PluginOpenApiSpec, PluginMetric) should only be implemented if functionality is needed
+- Authentication: Use `CacheableConnection` interface if connection needs caching; implement appropriate `*Authenticator` for each auth method supported
 
 ## Common Pitfalls
 - Forgetting to add models to `GetTablesInfo()` fails `plugins/table_info_test.go`
-- Migration scripts must be added to `All()` in `register.go`
-- API changes require running `make swag` to update Swagger docs
+- Migration structs that create a `_tool_*` table must embed `common.NoPKModel` (or `common.RawDataOrigin`) so the `_raw_data_*` columns exist — otherwise the ApiExtractor's cleanup query fails at runtime with `Unknown column '_raw_data_table'`. Guarded by the schema-drift e2e checks (see Testing → Schema-Drift Guard).
+- Migration scripts must be added to `All()` in `register.go` AND follow `YYYYMMDD_description.go` naming (validate with `make migration-script-lint`)
+- Never edit a migration script that has already shipped/run; fix schema issues with a **new** migration (append-only), since executed versions never re-run.
+- API changes require running `make swag` to update Swagger docs (this runs `make mock` first)
 - Python plugins require `libgit2` for gitextractor functionality
+- New Plugin interfaces like `PluginInit` or `PluginOpenApiSpec` are optional - only implement if needed
+- Blueprint V2.0 implementation required for plugins that support project-aware scope mapping
