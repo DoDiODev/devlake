@@ -198,7 +198,9 @@ updates:
         update-types:
           - version-update:semver-major
           - version-update:semver-minor
-      - dependency-name: mcr.microsoft.com/devcontainers/go
+      # Dependabot strips the registry host from the dependency name, so this
+      # must be "devcontainers/go" and not "mcr.microsoft.com/devcontainers/go".
+      - dependency-name: devcontainers/go
         update-types:
           - version-update:semver-major
           - version-update:semver-minor
