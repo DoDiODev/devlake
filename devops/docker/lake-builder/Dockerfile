@@ -73,8 +73,15 @@ RUN export GOPATH=/go &&  \
 
 # Golang Env
 ENV GOPATH=/go
-ENV GOROOT=/usr/local/go
-ENV PATH=${GOPATH}/bin:${GOROOT}/bin:${PATH}
+# Make sure GOROOT is unset (same as upstream).
+# The CI jobs install a pinned toolchain via backend/scripts/install-go.sh into
+# /opt/go/<version> and prepend it to PATH. A hard-coded GOROOT would keep
+# pointing at this image's own, older Go and break every build with
+#   compile: version "go1.26.2" does not match go tool version "go1.26.6"
+# With GOROOT unset, the go binary derives it from its own location, so both
+# the bundled and an externally installed toolchain work.
+ENV GOROOT=
+ENV PATH=${GOPATH}/bin:/usr/local/go/bin:${PATH}
 
 # Python package manager
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_UNMANAGED_INSTALL=/usr/local/bin sh
