@@ -46,9 +46,6 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: build(deps)
-    labels:
-      - dependencies
-      - go
     groups:
       go-minor-patch:
         patterns:
@@ -80,9 +77,6 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: build(deps)
-    labels:
-      - dependencies
-      - frontend
     groups:
       js-minor-patch:
         patterns:
@@ -107,9 +101,6 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: build(deps)
-    labels:
-      - dependencies
-      - frontend
     # This directory has no lockfile. Without `increase`, Dependabot would stay
     # silent as long as a new release still satisfies the declared caret range.
     versioning-strategy: increase
@@ -137,9 +128,6 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: build(deps)
-    labels:
-      - dependencies
-      - python
     groups:
       python-minor-patch:
         patterns:
@@ -172,9 +160,6 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: build(deps)
-    labels:
-      - dependencies
-      - docker
     groups:
       docker-patch:
         patterns:
@@ -224,9 +209,6 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: build(deps)
-    labels:
-      - dependencies
-      - ci
     groups:
       actions-minor-patch:
         patterns:
