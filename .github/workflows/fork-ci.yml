@@ -17,11 +17,14 @@
 
 # Fork-only CI.
 #
-# The upstream workflows (test.yml, test-e2e.yml, config-ui.yml,
-# asf-header-check.yml, ...) only trigger on `push` to `main` and on
-# `pull_request` with base `main`/`release-*`. In this fork we work on feature
-# branches (`pr/**`, `fix/**`, ...) and often stack pull requests on top of each
-# other, so those workflows never run before a PR is opened upstream.
+# Purpose: run every check that a pull request against `apache/devlake` would
+# trigger, but on this fork's feature branches, so a branch can be verified
+# before the upstream PR is opened.
+#
+# Why it is needed: the upstream workflows only trigger on `push` to `main` and
+# on `pull_request` with base `main`/`release-*`. In this fork we work on
+# feature branches (`pr/**`, `fix/**`, ...) and often stack pull requests on top
+# of each other, so those workflows never run beforehand.
 #
 # On top of that, the upstream jobs run inside `mericodev/lake-builder:latest`,
 # an image only the upstream maintainers can publish. Its published build is
@@ -31,6 +34,33 @@
 # `devops/docker/lake-builder/Dockerfile` (the very file such branches update)
 # and publishes it to GHCR, keyed by the Dockerfile hash so it is only rebuilt
 # when the recipe changes.
+#
+# Coverage map -- keep in sync when an upstream workflow changes:
+#
+#   upstream workflow            | job here                 | upstream PR trigger
+#   -----------------------------|--------------------------|--------------------
+#   golangci-lint.yml            | golangci-lint            | pull_request (any base)
+#   migration-script-lint.yml    | migration-script-lint    | pull_request (any base)
+#   test.yml                     | unit-test                | PR -> main/release-*
+#   test-e2e.yml                 | e2e-mysql, e2e-postgres  | PR -> main/release-*
+#   config-ui.yml                | config-ui                | PR -> main (config-ui/**)
+#   asf-header-check.yml         | asf-header-check         | PR -> main
+#   grafana-dashboards-check.yml | grafana-dashboards-check | PR -> main/release-*
+#   NOTICE-year-check.yml        | notice-year-check        | pull_request (any base)
+#   commit-msg.yml               | commit-msg               | pull_request (any base)
+#   yaml-lint.yml                | yaml-lint                | pull_request (any base)
+#   build.yml                    | -- not mirrored          | push only, never on PR
+#
+# Deliberately stricter than upstream:
+#   * `config-ui` runs without the `paths: config-ui/**` filter.
+#   * The `install-*.sh` toolchain scripts run even though the self-built image
+#     already ships a toolchain: upstream pins Go 1.26.6 / mockery 3.7.4 via
+#     those scripts, while the image Dockerfile installs Go 1.26.2. Running them
+#     keeps the fork on the exact upstream toolchain. They are idempotent and
+#     exit early when the version already matches.
+#   * `migration-script-lint` installs Go as well. Upstream does not (the job
+#     uses the image's old Go against a `go 1.26` directive) -- that
+#     inconsistency is what the pending wave 6 PR fixes.
 #
 # Guarded so it never runs in `apache/devlake` should the file ever be merged
 # upstream.
@@ -83,6 +113,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # mirrors golangci-lint.yml
   golangci-lint:
     name: lint (go)
     needs: builder-image
@@ -94,7 +125,20 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v6
-      - run: git config --global --add safe.directory $(pwd)
+      - name: Set git config
+        run: git config --global --add safe.directory $(pwd)
+      - name: Install libgit2 1.5 for git2go v34
+        run: backend/scripts/install-libgit2.sh
+      - name: Install Go 1.26.6
+        run: backend/scripts/install-go.sh
+      - name: Install mockery 3.7.4
+        run: backend/scripts/install-mockery.sh
+      - name: Cache golangci-lint
+        id: cache-golangci-lint
+        uses: actions/cache@v5
+        with:
+          path: golangci-lint
+          key: ${{ runner.os }}-backend-golangci-lint
       - name: generate mock
         run: |
           go version
@@ -106,6 +150,7 @@ jobs:
           version: v2.12.2
           working-directory: ./backend
 
+  # mirrors migration-script-lint.yml (plus the Go pin from the wave 6 PR)
   migration-script-lint:
     name: migration-script-lint
     needs: builder-image
@@ -117,13 +162,17 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v6
-      - run: git config --global --add safe.directory $(pwd)
+      - name: Set git config
+        run: git config --global --add safe.directory $(pwd)
+      - name: Install Go 1.26.6
+        run: backend/scripts/install-go.sh
       - name: migration script linting
         run: |
           go version
           cd backend
           go run core/migration/linter/main.go -p backend $(find . -path "**/migrationscripts/**.go")
 
+  # mirrors test.yml
   unit-test:
     name: unit-test
     needs: builder-image
@@ -135,12 +184,21 @@ jobs:
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v6
-      - run: git config --global --add safe.directory $(pwd)
+      - name: Set git config
+        run: git config --global --add safe.directory $(pwd)
+      - name: Install libgit2 1.5 for git2go v34
+        run: backend/scripts/install-libgit2.sh
+      - name: Install Go 1.26.6
+        run: backend/scripts/install-go.sh
+      - name: Install mockery 3.7.4
+        run: backend/scripts/install-mockery.sh
       - name: Build Python
         run: |
           cd backend
+          echo "Building Python"
           make build-python
-      - name: Cache go build
+      - name: Cache unit-test
+        id: cache-unit-test
         uses: actions/cache@v5
         with:
           path: |
@@ -156,13 +214,14 @@ jobs:
           cd backend
           make unit-test
 
+  # mirrors test-e2e.yml, job e2e-mysql
   e2e-mysql:
     name: e2e (mysql)
     needs: builder-image
     runs-on: ubuntu-latest
     services:
       db:
-        image: mysql:8
+        image: mysql:8.4.11
         env:
           MYSQL_DATABASE: lake
           MYSQL_USER: merico
@@ -176,11 +235,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - run: git config --global --add safe.directory $(pwd)
+      - name: Install libgit2 1.5 for git2go v34
+        run: backend/scripts/install-libgit2.sh
+      - name: Install Go 1.26.6
+        run: backend/scripts/install-go.sh
       - name: Build Python
         run: |
           cd backend
+          echo "Building Python"
           make build-python
-      - name: Cache go build
+      - name: Cache test-e2e
+        id: cache-test-e2e
         uses: actions/cache@v5
         with:
           path: |
@@ -200,6 +265,57 @@ jobs:
           make e2e-test-go-plugins
           make e2e-test
 
+  # mirrors test-e2e.yml, job e2e-postgres
+  e2e-postgres:
+    name: e2e (postgres)
+    needs: builder-image
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:18.4
+        env:
+          POSTGRES_DB: lake
+          POSTGRES_USER: merico
+          POSTGRES_PASSWORD: merico
+    container:
+      image: ${{ needs.builder-image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: git config --global --add safe.directory $(pwd)
+      - name: Install libgit2 1.5 for git2go v34
+        run: backend/scripts/install-libgit2.sh
+      - name: Install Go 1.26.6
+        run: backend/scripts/install-go.sh
+      - name: Build Python
+        run: |
+          cd backend
+          echo "Building Python"
+          make build-python
+      - name: Cache test-e2e-pg
+        id: cache-test-e2e-pg
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/go-build
+            ${{ env.GOPATH }}/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Test-pg
+        env:
+          DB_URL: postgres://merico:merico@db:5432/lake
+          E2E_DB_URL: postgres://merico:merico@db:5432/lake
+        run: |
+          go version
+          cp env.example .env
+          cd backend
+          make e2e-test-go-plugins
+          make e2e-test
+
+  # mirrors config-ui.yml (without its `paths: config-ui/**` filter)
   config-ui:
     name: config-ui
     if: github.repository != 'apache/devlake'
@@ -217,6 +333,7 @@ jobs:
       - name: Run Lint
         run: cd config-ui; yarn tsc && yarn lint
 
+  # mirrors asf-header-check.yml
   asf-header-check:
     name: check Apache license header
     if: github.repository != 'apache/devlake'
@@ -226,6 +343,7 @@ jobs:
       - name: Check License Header
         uses: apache/skywalking-eyes@main
 
+  # mirrors grafana-dashboards-check.yml
   grafana-dashboards-check:
     name: check grafana dashboards
     if: github.repository != 'apache/devlake'
@@ -238,4 +356,47 @@ jobs:
               echo "There are dashboards which use mysql uid as datasource"
               exit 1
           fi
+
+  # mirrors NOTICE-year-check.yml
+  notice-year-check:
+    name: notice-year-check
+    if: github.repository != 'apache/devlake'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: check the NOTICE file
+        run: grep $(date +"%Y") NOTICE
+
+  # mirrors commit-msg.yml -- needs a pull request to know the base commit
+  commit-msg:
+    name: commit-msg
+    if: github.repository != 'apache/devlake' && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Cache lint-commit-message
+        id: cache-lint-commit-message
+        uses: actions/cache@v5
+        with:
+          path: lint-commit-message
+          key: ${{ runner.os }}-lint-commit-message
+      - name: Lint commit message
+        run: |
+          ! git log --oneline ${{ github.event.pull_request.base.sha }}... \
+            | grep -vP '^\w{8,40} Merge ' \
+            | grep -vP '^\w{8,40} Revert ' \
+            | grep -vP '^\w{8,40} (feat|fix|build|chore|docs|style|refactor|perf|test|ci)(\(\w+(-\w+)?\))?:(\s*).*'
+
+  # mirrors yaml-lint.yml
+  yaml-lint:
+    name: lint for yamls
+    if: github.repository != 'apache/devlake'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: github/super-linter/slim@v4
+        env:
+          FILTER_REGEX_INCLUDE: workspace/(docker-compose.yml|deployment/k8s/k8s-deploy.yaml)
 
