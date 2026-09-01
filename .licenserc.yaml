@@ -51,6 +51,8 @@ header:
     - "**/poetry.lock"
     - "config-ui/.yarn/**/*"
     - "config-ui/yarn.lock"
+    - "**/yarn.lock"
+    - "**/package-lock.json"
     - ".github/ISSUE_TEMPLATE/*.md"
 
   comment: on-failure

@@ -1,0 +1,7 @@
+# Playwright generated output
+/playwright-report/
+/test-results/
+/screenshots/
+
+# Yarn 4 cache / state
+/.yarn/
