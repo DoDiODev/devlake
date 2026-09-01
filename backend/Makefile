@@ -22,12 +22,17 @@ TAG ?= $(shell if [ -d .git ]; then git tag --points-at HEAD; else echo "local_b
 IMAGE_REPO ?= "apache"
 VERSION = $(TAG)@$(SHA)
 PYTHON_DIR ?= "./python"
+MOCKERY_VERSION ?= v3.7.4
+# Always resolve mockery through the module cache instead of relying on whatever
+# `mockery` happens to be on the PATH: the CI builder image ships mockery v2,
+# which cannot read the v3 YAML configuration.
+MOCKERY ?= go run github.com/vektra/mockery/v3@$(MOCKERY_VERSION)
 
 
 all: build
 
 go-dep:
-	go install github.com/vektra/mockery/v3@v3.7.4
+	go install github.com/vektra/mockery/v3@$(MOCKERY_VERSION)
 	go install github.com/swaggo/swag/cmd/swag@v1.16.6
 	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
 
@@ -77,8 +82,8 @@ mock:
 	# required (and must run in this order): `helpers/unithelper` imports the
 	# generated `mocks/core/...` packages, and v3 type-checks the sources it
 	# parses, so the core mocks have to exist before the helpers tree loads.
-	mockery --config .mockery.core.yml
-	mockery --config .mockery.helpers.yml
+	$(MOCKERY) --config .mockery.core.yml
+	$(MOCKERY) --config .mockery.helpers.yml
 
 test: unit-test e2e-test
 
