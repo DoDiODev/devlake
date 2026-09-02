@@ -50,9 +50,25 @@
 #   commit-msg.yml               | commit-msg               | pull_request (any base)
 #   yaml-lint.yml                | yaml-lint                | pull_request (any base)
 #   build.yml                    | -- not mirrored          | push only, never on PR
+#   build-builder.yml            | -- not mirrored          | tag push only
+#   stale.yml                    | -- not mirrored          | schedule only
+#   auto-cherry-pick.yml         | -- not mirrored          | merged PRs only
+#
+# The map above is machine-checked by the `workflow-sync` job below
+# (.github/scripts/fork-ci-sync-check.py): it fails when an upstream job gains a
+# step, bumps an action/tool pin or a service image that this file does not
+# reproduce, and when a new upstream workflow starts running on `pull_request`
+# without a mirror here. Without that guard the mirror decays silently -- and a
+# weaker mirror is worse than none: fork-ci goes green, the upstream PR goes red.
 #
 # Deliberately stricter than upstream:
 #   * `config-ui` runs without the `paths: config-ui/**` filter.
+#   * `unit-test` and the two e2e jobs run without the `paths:` filters of
+#     test.yml / test-e2e.yml.
+#   * `commit-msg` also runs on `push`, linting every commit since the merge
+#     base with `origin/main`. Upstream can only lint on `pull_request`, so
+#     without this the message lint would first be exercised *after* the
+#     upstream PR is opened -- exactly what this workflow exists to prevent.
 #   * The `install-*.sh` toolchain scripts run even though the self-built image
 #     already ships a toolchain: upstream pins Go 1.26.6 / mockery 3.7.4 via
 #     those scripts, while the image Dockerfile installs Go 1.26.2. Running them
@@ -84,6 +100,22 @@ permissions:
   packages: write
 
 jobs:
+  # Keeps this file honest: every mirrored job must do at least what the
+  # upstream job does, and no upstream pull_request workflow may go unmirrored.
+  workflow-sync:
+    name: upstream workflow sync
+    if: github.repository != 'apache/devlake'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+      - name: Install PyYAML
+        run: pip install --quiet pyyaml
+      - name: Check fork-ci.yml against the upstream workflows
+        run: python3 .github/scripts/fork-ci-sync-check.py
+
   builder-image:
     name: builder image
     if: github.repository != 'apache/devlake'
@@ -367,10 +399,17 @@ jobs:
       - name: check the NOTICE file
         run: grep $(date +"%Y") NOTICE
 
-  # mirrors commit-msg.yml -- needs a pull request to know the base commit
+  # mirrors commit-msg.yml
+  #
+  # Upstream can only lint on `pull_request` (it needs
+  # `github.event.pull_request.base.sha`). Our verification branches are usually
+  # only *pushed*, so the message lint would otherwise never run before the
+  # upstream PR is opened. The push variant therefore reconstructs the base via
+  # the merge base with `origin/main` -- which, on a branch cut from
+  # `upstream/main`, covers at least the same commits.
   commit-msg:
     name: commit-msg
-    if: github.repository != 'apache/devlake' && github.event_name == 'pull_request'
+    if: github.repository != 'apache/devlake'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -383,8 +422,22 @@ jobs:
           path: lint-commit-message
           key: ${{ runner.os }}-lint-commit-message
       - name: Lint commit message
+        if: github.event_name == 'pull_request'
         run: |
           ! git log --oneline ${{ github.event.pull_request.base.sha }}... \
+            | grep -vP '^\w{8,40} Merge ' \
+            | grep -vP '^\w{8,40} Revert ' \
+            | grep -vP '^\w{8,40} (feat|fix|build|chore|docs|style|refactor|perf|test|ci)(\(\w+(-\w+)?\))?:(\s*).*'
+      - name: Lint commit message (push, against origin/main)
+        if: github.event_name != 'pull_request'
+        run: |
+          base=$(git merge-base origin/main HEAD || true)
+          if [ -z "$base" ]; then
+            echo "no merge base with origin/main - nothing to lint"
+            exit 0
+          fi
+          echo "linting commits since $base"
+          ! git log --oneline "$base"..HEAD \
             | grep -vP '^\w{8,40} Merge ' \
             | grep -vP '^\w{8,40} Revert ' \
             | grep -vP '^\w{8,40} (feat|fix|build|chore|docs|style|refactor|perf|test|ci)(\(\w+(-\w+)?\))?:(\s*).*'
