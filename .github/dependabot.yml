@@ -172,7 +172,6 @@ updates:
       - /grafana
       - /devops/docker/lake-builder
       - /.devcontainer
-      - /devops/deployment/k8s
     schedule:
       interval: weekly
       day: monday
@@ -216,6 +215,26 @@ updates:
         update-types:
           - version-update:semver-major
           - version-update:semver-minor
+
+  # Temporary isolated fork-validation entry; folded into the multi-directory
+  # Docker entry in the upstream PR.
+  - package-ecosystem: docker
+    directory: /devops/deployment/k8s
+    schedule:
+      interval: daily
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build(deps)
+    groups:
+      docker-patch:
+        patterns:
+          - "*"
+        update-types:
+          - patch
+    ignore:
+      - dependency-name: mysql
+        update-types:
+          - version-update:semver-major
 
   # ----------------------------------------------------- Docker Compose ---
   #
