@@ -26,11 +26,12 @@
 #     the reason, so the rule can be removed once the reason disappears.
 #
 # Known coverage gaps (intentionally not automated):
-#   * `docker-compose*.yml` is not read by the `docker` ecosystem, which only
-#     parses Dockerfiles. The `mysql`/`postgres` service images therefore stay
-#     on manual maintenance.
-#   * `devops/deployment/k8s/k8s-deploy.yaml` and the Helm chart pin images in
-#     plain YAML and are likewise out of scope.
+#   * Compose files use their own `docker-compose` ecosystem. Its filename
+#     matcher does not accept the two multi-suffix names
+#     `docker-compose-dev-mysql.yml` and `docker-compose-dev-postgresql.yml`,
+#     so the images in those files stay on manual maintenance.
+#   * Workflow `container:` and `services:` images are not covered either: the
+#     `github-actions` ecosystem only updates `uses:` references.
 #   * `backend/scripts/install-mockery.sh` pins a tool version in a shell
 #     script and is not a supported manifest format.
 version: 2
@@ -150,6 +151,12 @@ updates:
 
   # ------------------------------------------------------------- Docker ----
   #
+  # This block covers both Dockerfiles and Kubernetes manifests: the `docker`
+  # file fetcher also picks up YAML files that carry `apiVersion` and `kind`,
+  # which is why `/devops/deployment/k8s` is listed here. Only the `mysql`
+  # image there is pinned to a version; the `apache/devlake*` images use
+  # `latest` and are left untouched.
+  #
   # Note on Docker tag semantics: language base images encode their version in
   # the tag, so `node:24 -> node:25` is a major update while
   # `python:3.11 -> python:3.14` would count as a minor one. All three images
@@ -164,6 +171,7 @@ updates:
       - /grafana
       - /devops/docker/lake-builder
       - /.devcontainer
+      - /devops/deployment/k8s
     schedule:
       interval: weekly
       day: monday
@@ -201,6 +209,39 @@ updates:
         update-types:
           - version-update:semver-major
           - version-update:semver-minor
+
+  # ----------------------------------------------------- Docker Compose ---
+  #
+  # The separate Compose updater recognises four of the six non-release
+  # Compose files. The two docker-compose-dev-*.yml names are not matched by
+  # its current filename regexp and therefore remain a documented manual gap.
+  # Jira, Jenkins and Bitbucket are compatibility fixtures rather than runtime
+  # dependencies; their deliberately old versions must not be raised blindly.
+  - package-ecosystem: docker-compose
+    directories:
+      - /
+      - /.devcontainer
+      - /devops/deployment/temporal
+      - /backend/test/e2e/remote
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build(deps)
+    groups:
+      compose-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: jenkins/jenkins
+      - dependency-name: atlassian/jira-software
+      - dependency-name: atlassian/bitbucket-server
 
   # ------------------------------------------------------ GitHub Actions ---
   #
