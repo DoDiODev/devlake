@@ -54,5 +54,6 @@ header:
     - "**/yarn.lock"
     - "**/package-lock.json"
     - ".github/ISSUE_TEMPLATE/*.md"
+    - "**/.tool-versions"
 
   comment: on-failure
