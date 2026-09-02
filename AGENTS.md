@@ -247,6 +247,20 @@ identisch mit `upstream/main`. Zwei Fork-spezifische Fallstricke:
   von `upstream/main` abzweigen — bei `pull_request`-Events nutzt GitHub die
   Workflows des Merge-Refs, die Datei greift also trotzdem, ohne im Upstream-PR
   als Diff aufzutauchen.
+- **`fork-ci.yml` muss mindestens so streng sein wie die Upstream-Workflows.**
+  Ein *schwächerer* Spiegel ist schlimmer als gar keiner: fork-ci wird grün, der
+  Apache-PR rot — genau das, was die Datei verhindern soll. Deshalb erzwingt der
+  Job `workflow-sync` (`.github/scripts/fork-ci-sync-check.py`), dass die
+  normalisierte Step-Liste jedes Upstream-Jobs eine **geordnete Teilfolge** des
+  spiegelnden fork-ci-Jobs ist (fork-eigene Zusatzschritte erlaubt, fehlende oder
+  geänderte Upstream-Steps nicht), dass Service-Images und `runs-on`
+  übereinstimmen und dass **kein** Upstream-Workflow mit `pull_request`-Trigger
+  ohne Mirror bleibt. Lokal: `python3 .github/scripts/fork-ci-sync-check.py`.
+  Schlägt der Job nach einem `upstream/main`-Merge fehl, ist **fork-ci
+  nachzuziehen** — nicht der Guard aufzuweichen; bewusste Ausnahmen gehören mit
+  Begründung nach `NOT_MIRRORED`/`WAIVERS`.
+  `fork-ci.yml` existiert in **zwei** Branches (Fork-`main` und `local/base`) und
+  ist dort byte-identisch zu halten — Änderungen per Cherry-Pick auf beide.
 - **`action_required` bei Upstream-PRs ist normal, kein Fehler.** Workflows an
   Fork-PRs gegen `apache/devlake` starten grundsätzlich in `action_required`; ein
   Maintainer klickt „Approve and run workflows". Das passiert **routinemäßig** —
