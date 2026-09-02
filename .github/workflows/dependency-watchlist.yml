@@ -33,6 +33,20 @@
 # of repo inactivity. Re-enable with `gh workflow enable dependency-watchlist`
 # if the scheduled run silently stops appearing. `workflow_dispatch` always
 # works regardless.
+#
+# A RED RUN IS NEVER "NO NEWS". There are exactly two ways this workflow fails,
+# and they mean opposite things:
+#   * "Query external unblock conditions" failed -> at least one upstream API
+#     could not be reached. The verdict is UNKNOWN, not "still gated"; re-run
+#     it, do not assume the gates still hold (see MANUAL_VERSION_AUDIT.prompt.md
+#     section 4).
+#   * any later step failed -> the verdict itself is valid and readable in the
+#     step summary; only the reporting broke.
+# Historical example of the second kind: three consecutive scheduled runs
+# (2026-08-17/24/31) went red because the summary was written with `echo "..."`
+# containing backticks, so the shell tried to execute `swag-v2` as a command.
+# The gate verdicts in those runs were correct all along. Always write the
+# summary through an env var with `printf '%s\n'`, never inline the value.
 name: dependency-watchlist
 
 on:
@@ -99,8 +113,13 @@ jobs:
 
           summary_lines = []
           any_unblocked = False
+          errors = []
           for key, ver, unblocked, detail in findings:
-              status = "UNBLOCKED" if unblocked else "gated"
+              if ver == "ERROR":
+                  status = "UNKNOWN (query failed)"
+                  errors.append(f"{key}: {detail}")
+              else:
+                  status = "UNBLOCKED" if unblocked else "gated"
               summary_lines.append(f"- `{key}`: **{status}** ({detail})")
               if unblocked:
                   any_unblocked = True
@@ -109,12 +128,18 @@ jobs:
           print("\n".join(summary_lines))
           print("EOF")
           print(f"any_unblocked={'true' if any_unblocked else 'false'}")
+          print("errors<<EOF")
+          print("\n".join(errors))
+          print("EOF")
 
-          # per-item outputs for the issue step
+          # per-item outputs for the issue step; `detail` may contain an exception
+          # message, so collapse newlines - a multi-line value would corrupt the
+          # single-line `key=value` form of $GITHUB_OUTPUT.
           for key, ver, unblocked, detail in findings:
               safe_key = key.replace('-', '_')
+              flat_detail = " ".join(str(detail).split())
               print(f"{safe_key}_unblocked={'true' if unblocked else 'false'}")
-              print(f"{safe_key}_detail={detail}")
+              print(f"{safe_key}_detail={flat_detail}")
           PYEOF
 
       - name: Print summary
@@ -157,4 +182,20 @@ jobs:
           else
             gh issue create --title "$TITLE" --body "$BODY" --label dependencies
           fi
+
+      # Deliberately last: the summary and the tracking issue must be produced
+      # even when a query failed, otherwise a single flaky endpoint would hide
+      # the verdicts of the items that *were* reachable.
+      - name: Fail if any gate could not be evaluated
+        if: steps.check.outputs.errors != ''
+        env:
+          ERRORS: ${{ steps.check.outputs.errors }}
+        run: |
+          # An unreachable endpoint means "unknown", not "still gated". Failing
+          # loudly here is intentional: a silently-skipped gate would let the
+          # manual audit report an unverified item as verified.
+          printf 'At least one watchlist query failed - verdict is UNKNOWN:\n%s\n' "$ERRORS"
+          printf '\n> [!CAUTION]\n> Watchlist incomplete, re-run required:\n\n```\n%s\n```\n' \
+            "$ERRORS" >> "$GITHUB_STEP_SUMMARY"
+          exit 1
 
