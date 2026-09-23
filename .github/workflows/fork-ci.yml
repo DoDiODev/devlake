@@ -107,7 +107,7 @@ jobs:
     if: github.repository != 'apache/devlake'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: '3.x'
@@ -123,7 +123,7 @@ jobs:
     outputs:
       image: ${{ steps.meta.outputs.image }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Compute image reference
         id: meta
         run: |
@@ -156,7 +156,7 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Set git config
         run: git config --global --add safe.directory $(pwd)
       - name: Install libgit2 1.5 for git2go v34
@@ -193,7 +193,7 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Set git config
         run: git config --global --add safe.directory $(pwd)
       - name: Install Go 1.26.6
@@ -215,7 +215,7 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Set git config
         run: git config --global --add safe.directory $(pwd)
       - name: Install libgit2 1.5 for git2go v34
@@ -265,7 +265,7 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - run: git config --global --add safe.directory $(pwd)
       - name: Install libgit2 1.5 for git2go v34
         run: backend/scripts/install-libgit2.sh
@@ -315,7 +315,7 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - run: git config --global --add safe.directory $(pwd)
       - name: Install libgit2 1.5 for git2go v34
         run: backend/scripts/install-libgit2.sh
@@ -353,7 +353,7 @@ jobs:
     if: github.repository != 'apache/devlake'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
@@ -371,7 +371,7 @@ jobs:
     if: github.repository != 'apache/devlake'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Check License Header
         uses: apache/skywalking-eyes@main
 
@@ -381,7 +381,7 @@ jobs:
     if: github.repository != 'apache/devlake'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Check grafana dashboards whether using mysql uid
         run: |
           if grep '"type": "mysql"' grafana/dashboards/*; then
@@ -395,7 +395,7 @@ jobs:
     if: github.repository != 'apache/devlake'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: check the NOTICE file
         run: grep $(date +"%Y") NOTICE
 
@@ -412,7 +412,7 @@ jobs:
     if: github.repository != 'apache/devlake'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Cache lint-commit-message
@@ -448,7 +448,7 @@ jobs:
     if: github.repository != 'apache/devlake'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: github/super-linter/slim@v4
         env:
           FILTER_REGEX_INCLUDE: workspace/(docker-compose.yml|deployment/k8s/k8s-deploy.yaml)
