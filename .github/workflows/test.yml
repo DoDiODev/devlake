@@ -27,9 +27,9 @@ on:
       - '**.py'
       - '**.toml'
       - '**.sh'
-      - 'Makefile'
-      - 'go.mod'
-      - 'go.sum'
+      - '**/Makefile'
+      - '**/go.mod'
+      - '**/go.sum'
       - '.github/workflows/*.yml'
       - 'test/**'
   schedule:

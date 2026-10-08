@@ -102,8 +102,9 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: build(deps)
-    # This directory has no lockfile. Without `increase`, Dependabot would stay
-    # silent as long as a new release still satisfies the declared caret range.
+    # Raise the caret range in package.json together with package-lock.json so
+    # the declared minimum always matches the locked version. The default
+    # `auto` may classify this non-private package as a library and only widen.
     versioning-strategy: increase
     groups:
       e2e-minor-patch:
