@@ -158,9 +158,9 @@ jobs:
         run: git config --global --add safe.directory $(pwd)
       - name: Install libgit2 1.5 for git2go v34
         run: backend/scripts/install-libgit2.sh
-      - name: Install Go 1.26.6
+      - name: Install Go 1.26.9
         run: backend/scripts/install-go.sh
-      - name: Install mockery 3.7.4
+      - name: Install mockery 3.8.1
         run: backend/scripts/install-mockery.sh
       - name: Cache golangci-lint
         id: cache-golangci-lint
@@ -176,7 +176,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.12.2
+          version: v2.14.0
           working-directory: ./backend
 
   # mirrors migration-script-lint.yml
@@ -193,7 +193,7 @@ jobs:
       - uses: actions/checkout@v7
       - name: Set git config
         run: git config --global --add safe.directory $(pwd)
-      - name: Install Go 1.26.6
+      - name: Install Go 1.26.9
         run: backend/scripts/install-go.sh
       - name: migration script linting
         run: |
@@ -217,14 +217,14 @@ jobs:
         run: git config --global --add safe.directory $(pwd)
       - name: Install libgit2 1.5 for git2go v34
         run: backend/scripts/install-libgit2.sh
-      - name: Install Go 1.26.6
+      - name: Install Go 1.26.9
         run: backend/scripts/install-go.sh
       - name: Check go.mod is tidy without generated mocks
         run: |
           cd backend
           go mod tidy
           git diff --exit-code -- go.mod go.sum
-      - name: Install mockery 3.7.4
+      - name: Install mockery 3.8.1
         run: backend/scripts/install-mockery.sh
       - name: Build Python
         run: |
@@ -271,7 +271,7 @@ jobs:
       - run: git config --global --add safe.directory $(pwd)
       - name: Install libgit2 1.5 for git2go v34
         run: backend/scripts/install-libgit2.sh
-      - name: Install Go 1.26.6
+      - name: Install Go 1.26.9
         run: backend/scripts/install-go.sh
       - name: Build Python
         run: |
@@ -321,7 +321,7 @@ jobs:
       - run: git config --global --add safe.directory $(pwd)
       - name: Install libgit2 1.5 for git2go v34
         run: backend/scripts/install-libgit2.sh
-      - name: Install Go 1.26.6
+      - name: Install Go 1.26.9
         run: backend/scripts/install-go.sh
       - name: Build Python
         run: |
