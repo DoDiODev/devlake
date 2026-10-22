@@ -16,6 +16,8 @@ limitations under the License.
 -->
 # Apache DevLake - AI Coding Agent Instructions
 
+> Fork-local: if `scripts-local/AGENTS.fork.md` exists, read it as well (local rules, e.g. never `docker compose down -v`).
+
 ## Project Overview
 Apache DevLake is a dev data platform that ingests data from DevOps tools (GitHub, GitLab, Jira, Jenkins, etc.), transforms it into standardized domain models, and enables metrics/dashboards via Grafana.
 
