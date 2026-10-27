@@ -72,6 +72,7 @@ MIRRORS: dict[str, tuple[str, str]] = {
     "notice-year-check": ("NOTICE-year-check.yml", "notice-year-check"),
     "commit-msg": ("commit-msg.yml", "commit-msg"),
     "yaml-lint": ("yaml-lint.yml", "yaml-lint"),
+    "asf-allowlist-check": ("asf-allowlist-check.yml", "asf-allowlist-check"),
 }
 
 # Upstream workflows that are reachable from a pull_request event but must not

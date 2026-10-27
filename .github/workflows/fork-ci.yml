@@ -49,6 +49,7 @@
 #   NOTICE-year-check.yml        | notice-year-check        | pull_request (any base)
 #   commit-msg.yml               | commit-msg               | pull_request (any base)
 #   yaml-lint.yml                | yaml-lint                | pull_request (any base)
+#   asf-allowlist-check.yml      | asf-allowlist-check      | PR (.github/**)
 #   build.yml                    | -- not mirrored          | push only, never on PR
 #   build-builder.yml            | -- not mirrored          | tag push only
 #   stale.yml                    | -- not mirrored          | schedule only
@@ -461,3 +462,16 @@ jobs:
           MULTI_STATUS: false
           FILTER_REGEX_INCLUDE: (^|/)(docker-compose-dev-(mysql|postgresql)\.yml|docker-compose\.datasources\.yml|devops/deployment/k8s/k8s-deploy\.yaml)$
 
+  asf-allowlist-check:
+    name: ASF action allowlist
+    if: github.repository != 'apache/devlake'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # `apache/*` is implicitly trusted, but pinning keeps the run reproducible
+      # and lets Dependabot track the monorepo's per-action tag prefix.
+      - uses: apache/infrastructure-actions/allowlist-check@47b297bbe90f580139129bee531bd84bd95b7f5d # allowlist-check/v1.0.4
+        with:
+          scan-glob: ".github/workflows/*.yml"
