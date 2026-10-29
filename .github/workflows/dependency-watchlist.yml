@@ -206,6 +206,3 @@ jobs:
           printf '\n> [!CAUTION]\n> Watchlist incomplete, re-run required:\n\n```\n%s\n```\n' \
             "$ERRORS" >> "$GITHUB_STEP_SUMMARY"
           exit 1
-
-
-
