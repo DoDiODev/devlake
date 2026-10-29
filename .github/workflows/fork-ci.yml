@@ -26,11 +26,11 @@
 # feature branches (`pr/**`, `fix/**`, ...) and often stack pull requests on top
 # of each other, so those workflows never run beforehand.
 #
-# On top of that, the upstream jobs run inside `mericodev/lake-builder:latest`,
-# an image only the upstream maintainers can publish. Its published build is
-# stale (Go 1.20, libgit2 1.3.2, mockery v2), so every branch that upgrades
-# dependencies fails with errors that have nothing to do with the change
-# itself. This workflow therefore builds the builder image from
+# On top of that, the upstream jobs run inside a pinned, tagged builder image
+# (`apache/devlake:lake-builder-vX.Y.Z`, #9271) that only upstream committers
+# can publish (Git tag `builder-v*`). A branch that changes the toolchain is
+# still tested against the old tag upstream. This workflow therefore builds
+# the builder image from
 # `devops/docker/lake-builder/Dockerfile` (the very file such branches update)
 # and publishes it to GHCR, keyed by the Dockerfile hash so it is only rebuilt
 # when the recipe changes.

@@ -87,8 +87,8 @@ FORK_ONLY = {"fork-ci.yml", "dependency-watchlist.yml"}
 # Documented, intentional deviations. Key: fork-ci job id.
 WAIVERS: dict[str, str] = {
     # The fork builds its own lake-builder image from
-    # devops/docker/lake-builder/Dockerfile because the published
-    # mericodev/lake-builder:latest is stale and only upstream can republish it.
+    # devops/docker/lake-builder/Dockerfile because upstream pins a tagged
+    # apache/devlake:lake-builder-vX.Y.Z that only committers can republish.
     "container-image": "fork builds lake-builder from the repo Dockerfile",
 }
 
