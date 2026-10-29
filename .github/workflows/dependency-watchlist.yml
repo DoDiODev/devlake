@@ -62,6 +62,11 @@ jobs:
     name: check gated majors (wave 4h)
     if: github.repository != 'apache/devlake'
     runs-on: ubuntu-latest
+    env:
+      # No checkout in this job, so `gh` cannot infer the repo from a local
+      # .git - without this every `gh label`/`gh issue` call fails with
+      # "fatal: not a git repository" (first hit 2026-10-29, node-26-lts).
+      GH_REPO: ${{ github.repository }}
     steps:
       - name: Query external unblock conditions
         id: check
