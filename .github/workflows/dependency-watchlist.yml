@@ -34,6 +34,9 @@
 # if the scheduled run silently stops appearing. `workflow_dispatch` always
 # works regardless.
 #
+# NOTE: the tracking issue needs Issues enabled on the fork (forks start with
+# Issues disabled): `gh repo edit <fork> --enable-issues`.
+#
 # A RED RUN IS NEVER "NO NEWS". There are exactly two ways this workflow fails,
 # and they mean opposite things:
 #   * "Query external unblock conditions" failed -> at least one upstream API
@@ -203,4 +206,6 @@ jobs:
           printf '\n> [!CAUTION]\n> Watchlist incomplete, re-run required:\n\n```\n%s\n```\n' \
             "$ERRORS" >> "$GITHUB_STEP_SUMMARY"
           exit 1
+
+
 
