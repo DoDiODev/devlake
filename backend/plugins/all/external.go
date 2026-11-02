@@ -15,25 +15,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package models
+//go:build devlake_external_plugins
 
-import git "github.com/libgit2/git2go/v34"
-
-type DiffLines []git.DiffLine
-
-// Len return length of diffLines
-func (diffLines DiffLines) Len() int {
-	return len(diffLines)
-}
-
-// Less function
-func (diffLines DiffLines) Less(i, j int) bool {
-	return diffLines[i].OldLineno > diffLines[j].OldLineno
-}
-
-// Swap function
-func (diffLines DiffLines) Swap(i, j int) {
-	temp := diffLines[i]
-	diffLines[i] = diffLines[j]
-	diffLines[j] = temp
-}
+// Package all is empty in a core-only build.
+//
+// A core-only binary compiles in the framework and the API but no plugin, which
+// is useful for a minimal image: every plugin is then sideloaded as a shared
+// object from PLUGIN_DIR. The default build links the official plugins in and
+// still accepts extra .so files from PLUGIN_DIR on top.
+//
+// A sideloaded plugin must be built with the same Go toolchain, build flags and
+// dependency versions as the binary loading it, so build it in the matching
+// builder image rather than on the host.
+package all
