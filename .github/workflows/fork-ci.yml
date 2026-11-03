@@ -160,7 +160,7 @@ jobs:
         run: git config --global --add safe.directory $(pwd)
       - name: Install Go 1.27.3
         run: backend/scripts/install-go.sh
-      - name: Install mockery 3.8.1
+      - name: Install mockery 3.9.0
         run: backend/scripts/install-mockery.sh
       - name: Cache golangci-lint
         id: cache-golangci-lint
@@ -176,7 +176,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.14.0
+          version: v2.15.0
           working-directory: ./backend
 
   # mirrors migration-script-lint.yml
@@ -227,7 +227,7 @@ jobs:
           cd backend
           go run ./tools/pluginsgen
           git diff --exit-code -- plugins/all
-      - name: Install mockery 3.8.1
+      - name: Install mockery 3.9.0
         run: backend/scripts/install-mockery.sh
       - name: Build Python
         run: |
