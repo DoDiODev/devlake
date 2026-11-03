@@ -46,6 +46,7 @@
 #   config-ui.yml                | config-ui                | PR -> main (config-ui/**)
 #   asf-header-check.yml         | asf-header-check         | PR -> main
 #   grafana-dashboards-check.yml | grafana-dashboards-check | PR -> main/release-*
+#   grafana-image-smoke-test.yml | grafana-image-smoke-test | PR -> main/release-* (grafana/**)
 #   NOTICE-year-check.yml        | notice-year-check        | pull_request (any base)
 #   commit-msg.yml               | commit-msg               | pull_request (any base)
 #   yaml-lint.yml                | yaml-lint                | pull_request (any base)
@@ -66,6 +67,7 @@
 #   * `config-ui` runs without the `paths: config-ui/**` filter.
 #   * `unit-test` and the two e2e jobs run without the `paths:` filters of
 #     test.yml / test-e2e.yml.
+#   * `grafana-image-smoke-test` runs without the `paths: grafana/**` filter.
 #   * `commit-msg` also runs on `push`, linting every commit since the merge
 #     base with `origin/main`. Upstream can only lint on `pull_request`, so
 #     without this the message lint would first be exercised *after* the
@@ -389,6 +391,22 @@ jobs:
               echo "There are dashboards which use mysql uid as datasource"
               exit 1
           fi
+
+  # mirrors grafana-image-smoke-test.yml
+  grafana-image-smoke-test:
+    name: grafana image smoke test (${{ matrix.db }})
+    if: github.repository != 'apache/devlake'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        db: [mysql, postgresql]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build grafana image
+        run: docker build -t devlake-dashboard:smoke grafana
+      - name: Start image and check datasource
+        run: grafana/scripts/smoke-test.sh devlake-dashboard:smoke ${{ matrix.db }}
 
   # mirrors NOTICE-year-check.yml
   notice-year-check:

@@ -69,6 +69,7 @@ MIRRORS: dict[str, tuple[str, str]] = {
     "config-ui": ("config-ui.yml", "lint"),
     "asf-header-check": ("asf-header-check.yml", "check-ASF-header"),
     "grafana-dashboards-check": ("grafana-dashboards-check.yml", "check-grafana-dashboards"),
+    "grafana-image-smoke-test": ("grafana-image-smoke-test.yml", "grafana-image-smoke-test"),
     "notice-year-check": ("NOTICE-year-check.yml", "notice-year-check"),
     "commit-msg": ("commit-msg.yml", "commit-msg"),
     "yaml-lint": ("yaml-lint.yml", "yaml-lint"),
