@@ -17,7 +17,8 @@
 
 # Fork-only watchdog for the "extern gated" dependency majors tracked in
 # scripts-local/pr-descriptions/plan-wave4hGated.prompt.md (swag v1->v2,
-# TypeScript 6->7, Node 24->26 LTS). Dependabot itself cannot express "wait
+# TypeScript 6->7; Node 24->26 LTS was dropped after it unblocked, wave 16
+# / apache/devlake#9383). Dependabot itself cannot express "wait
 # until this external condition holds" - it only understands static
 # name/version-range/update-type matchers (see `ignore:` in the planned
 # `.github/dependabot.yml`, Wave 5). This workflow replaces the manual
@@ -94,17 +95,7 @@ jobs:
           except Exception as e:
               findings.append(("swag-v2", "ERROR", False, str(e)))
 
-          # 2. Node 24 -> 26: unblocked once a v26 release has lts != false
-          try:
-              idx = get("https://nodejs.org/dist/index.json")
-              node26 = next((x for x in idx if x["version"].startswith("v26")), None)
-              lts_ok = bool(node26 and node26.get("lts"))
-              findings.append(("node-26-lts", node26["version"] if node26 else "n/a", lts_ok,
-                  f"node v26 entry: lts={node26.get('lts') if node26 else None}"))
-          except Exception as e:
-              findings.append(("node-26-lts", "ERROR", False, str(e)))
-
-          # 3. TypeScript 6 -> 7: flag (not a hard yes/no) once typescript-eslint's
+          # 2. TypeScript 6 -> 7: flag (not a hard yes/no) once typescript-eslint's
           #    declared peer range for `typescript` appears to include a 7.x major.
           #    This is a heuristic - a real "yes" still requires `yarn build && yarn lint`
           #    against typescript@7 locally before drawing conclusions.
